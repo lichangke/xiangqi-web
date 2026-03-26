@@ -11,8 +11,8 @@
 - 最后更新时间：2026-03-26
 
 ## 1. 当前阶段
-- 当前阶段：Tasks
-- 当前阶段状态：plan.md 已确认；tasks.md 已正式落盘为草案，当前处于 Tasks 收口与门禁检查阶段
+- 当前阶段：Execution Contract
+- 当前阶段状态：tasks.md 已确认；execution-contract.md 已正式落盘为草案，当前处于 Execution Contract 收口与门禁检查阶段
 
 ## 2. 各核心文档状态
 ### spec.md
@@ -26,14 +26,14 @@
 - 备注：已完成 Plan checklist 复核与编号映射修正，允许进入 Tasks
 
 ### tasks.md
-- 状态：已创建（草案中）
-- 是否已确认：否
-- 备注：已基于已确认 spec.md 与 plan.md 落盘第一版 tasks 草案，待进一步审核收口
+- 状态：已创建（已确认）
+- 是否已确认：是
+- 备注：已完成 Tasks checklist 复核与关键依赖补强，允许进入 Execution Contract
 
 ### execution-contract.md
-- 状态：未创建
+- 状态：已创建（草案中）
 - 是否已确认：否
-- 备注：需在 tasks.md 确认后再进入
+- 备注：已基于已确认 tasks.md 落盘 Task Bundle A 的第一版执行协议草案，待进一步审核收口
 
 ### review.md
 - 状态：未创建
@@ -42,20 +42,20 @@
 
 ## 3. 当前中断点
 ### 上次停在什么位置
-已完成 plan.md 确认并落盘 tasks.md 第一版草案，当前处于 Tasks 阶段的审核收口阶段。
+已完成 tasks.md 确认并落盘 execution-contract.md 第一版草案，当前处于 Execution Contract 阶段的审核收口阶段。
 
 ### 为什么停下
-tasks 虽已落盘，但仍需按 checklist 审视任务颗粒度、依赖关系、验证方式与 task bundle 划分是否足够清晰，再决定能否进入 Execution Contract / Implement 准备。
+execution-contract 虽已落盘，但仍需按当前实现计划与执行者安排，确认是否允许正式进入 Implement。
 
 ### 恢复时应先处理什么
-先审阅 tasks.md，结合 Tasks 检查单补齐必要项，再判断是否可以进入 Execution Contract。
+先审阅 execution-contract.md，确认 Task Bundle A 的执行边界、执行者与返回规则是否足够清晰，再判断是否进入 Implement。
 
 ## 4. 下一步唯一推荐动作
-审阅并收口 tasks.md，执行 Tasks 阶段门禁检查。
+审阅并收口 execution-contract.md，决定是否允许进入 Implement。
 
 ## 5. 当前阻塞 / 未决问题
-- 尚未对 tasks.md 执行正式的 Tasks 门禁检查
-- 各 task bundle 的 handoff 粒度与执行批次仍可在 Tasks 收口中继续细化，但当前不构成 tasks 草案落盘阻塞
+- 尚未对 execution-contract.md 执行正式的收口判断
+- 当前执行者与实际实现方式（本地实现 / ACP 会话）仍待在进入 Implement 前最终确定
 
 ## 6. 最近执行痕迹摘要
 - [2026-03-26] 完成项目目录初始化
@@ -74,25 +74,28 @@ tasks 虽已落盘，但仍需按 checklist 审视任务颗粒度、依赖关系
 - [2026-03-26] 完成 spec 确认回写，并创建 plan.md 第一版草案，项目正式进入 Plan 收口阶段
 - [2026-03-27] 完成 Plan checklist 复核，修正 FR 映射编号并确认 plan.md
 - [2026-03-27] 创建 tasks.md 第一版草案，项目正式进入 Tasks 收口阶段
+- [2026-03-27] 完成 Tasks checklist 复核，补齐 task bundle 映射说明与 T90 关键依赖，并确认 tasks.md
+- [2026-03-27] 创建 execution-contract.md 第一版草案，项目正式进入 Execution Contract 收口阶段
 
 ## 7. 当前执行范围（Implement 阶段重点填写）
 ### 当前正在执行
-- tasks.md 审核与收口
+- execution-contract.md 审核与收口
 
 ### 当前已完成
 - 项目启动与需求讨论的第一轮收口
 - 项目目录与初始文档落盘
 - spec.md 第一版草案起草与确认
 - plan.md 第一版草案起草与确认
-- tasks.md 第一版草案起草
+- tasks.md 第一版草案起草与确认
+- execution-contract.md 第一版草案起草
 
 ### 当前未完成
-- Tasks 门禁检查
-- execution-contract.md 起草
-- 后续 SDD 阶段推进
+- Execution Contract 收口
+- Implement 启动
+- 后续实现回收与 Review
 
 ### 当前验证情况
-- 当前为任务拆解起草与审核阶段，尚未进入代码实现验证
+- 当前为执行协议起草与审核阶段，尚未进入代码实现验证
 
 ## 8. 当前实现执行状态
 - 当前执行代理：莫邪
@@ -100,8 +103,8 @@ tasks 虽已落盘，但仍需按 checklist 审视任务颗粒度、依赖关系
 - 当前会话策略：主会话讨论
 - 当前 repo / cwd：xiangqi-web
 - 当前轮次：项目启动
-- 当前 task bundle：plan.md 确认回写与 tasks.md 草案起草
-- 当前执行状态：recovered
+- 当前 task bundle：Task Bundle A（基础框架与规则基线）
+- 当前执行状态：prepared
 - 最近一次执行结果：成功
 - 当前会话是否仍可复用：是
 
@@ -109,5 +112,5 @@ tasks 虽已落盘，但仍需按 checklist 审视任务颗粒度、依赖关系
 默认恢复顺序：
 1. 先看本状态卡
 2. 再读 docs/需求分析结论.md
-3. 若需恢复上下文，先读已确认的 spec.md 与 plan.md
-4. 结合检查单审阅 tasks.md，并决定是否进入 Execution Contract
+3. 若需恢复上下文，先读已确认的 spec.md、plan.md 与 tasks.md
+4. 审阅 execution-contract.md，并决定是否进入 Implement
