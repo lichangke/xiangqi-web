@@ -1,0 +1,43 @@
+# Environment
+.env
+.env.*
+!.env.example
+*.local
+
+# Secrets / credentials
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*.csr
+secrets/
+.secret*
+credentials/
+*credentials*.json
+service-account*.json
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+coverage/
+.tmp/
+tmp/
+.cache/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
