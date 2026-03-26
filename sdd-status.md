@@ -51,7 +51,7 @@
 根据 execution-contract.md 启动 Task Bundle A 的实现执行，并在结果返回后完成第一次回收。
 
 ## 4. 下一步唯一推荐动作
-启动 Task Bundle A 的 Implement 执行（Codex / ACP 会话，单任务隔离）。
+启动 Task Bundle A 的 Implement 执行（subagent，会话隔离）。
 
 ## 5. 当前阻塞 / 未决问题
 - 当前无新的关键阻塞
@@ -75,7 +75,8 @@
 - [2026-03-27] 创建 tasks.md 第一版草案，项目正式进入 Tasks 收口阶段
 - [2026-03-27] 完成 Tasks checklist 复核，补齐 task bundle 映射说明与 T90 关键依赖，并确认 tasks.md
 - [2026-03-27] 创建 execution-contract.md 第一版草案，项目正式进入 Execution Contract 收口阶段
-- [2026-03-27] 完成 execution-contract 收口：明确执行者为 Codex、执行方式为 ACP 会话、默认回退目标为“仅补充 Execution Contract”，允许进入 Implement
+- [2026-03-27] 完成 execution-contract 收口：明确默认回退目标为“仅补充 Execution Contract”，允许进入 Implement
+- [2026-03-27] 因 Codex ACP 链路稳定性不足，将 Task Bundle A 的默认执行者从 Codex 调整为 subagent，执行方式改为 OpenClaw subagent 会话
 
 ## 7. 当前执行范围（Implement 阶段重点填写）
 ### 当前正在执行
@@ -98,7 +99,7 @@
 - 当前为执行协议已确认、实现尚未启动阶段，尚未进入代码实现验证
 
 ## 8. 当前实现执行状态
-- 当前执行代理：Codex
+- 当前执行代理：subagent
 - 当前执行模式：Coding Agent 实现
 - 当前会话策略：单任务隔离
 - 当前 repo / cwd：xiangqi-web
