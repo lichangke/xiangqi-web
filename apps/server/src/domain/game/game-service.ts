@@ -229,11 +229,12 @@ export class GameService {
 
   private buildGameView(game: GameSession) {
     const history = parseMoveHistory(game.moveHistory);
+    const gameState = this.rules.getGameState(game.currentFen);
     const currentTurn = game.status === GameStatus.ONGOING
-      ? (this.rules.getGameState(game.currentFen).nextTurn === 'r' ? 'USER' : 'AI')
+      ? (gameState.nextTurn === 'r' ? 'USER' : 'AI')
       : null;
 
-    return toGameSummary(game, history, currentTurn);
+    return toGameSummary(game, history, currentTurn, gameState.isCheck);
   }
 
   private createMoveRecord(

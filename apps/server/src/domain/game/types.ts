@@ -64,6 +64,7 @@ export function toGameSummary(
   game: GameSession,
   history: PersistedMoveRecord[],
   currentTurn: 'USER' | 'AI' | null,
+  isCheck: boolean,
 ): GameSummary {
   return {
     id: game.id,
@@ -76,6 +77,7 @@ export function toGameSummary(
     userSide: toSideColor(game.userSide, 'red'),
     aiSide: toSideColor(game.aiSide, 'black'),
     currentTurn,
+    isCheck,
     resultWinner: game.resultWinner === 'red' || game.resultWinner === 'black'
       ? game.resultWinner
       : null,

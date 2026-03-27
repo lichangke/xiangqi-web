@@ -65,6 +65,7 @@ export type GameSummary = {
   userSide: SideColor;
   aiSide: SideColor;
   currentTurn: PlayerTurn;
+  isCheck: boolean;
   resultWinner: SideColor | null;
   endedByResign: boolean;
   startedAt: string;

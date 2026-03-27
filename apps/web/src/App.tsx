@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
-  ApiErrorShape,
   CreateGameResponse,
   Difficulty,
   GameSummary,
@@ -8,8 +7,19 @@ import type {
   LoginResponse,
   ResignGameResponse,
   SubmitMoveResponse,
+  ThemeKey,
   UndoGameResponse,
 } from '@xiangqi-web/shared';
+import {
+  THEME_OPTIONS,
+  buildCheckEvent,
+  buildErrorEvent,
+  buildFinishEvent,
+  buildNarrativeTurns,
+  buildUndoEvent,
+  normalizeApiError,
+  type EventCard,
+} from './presentation';
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] as const;
 const DIFFICULTIES: Array<{ value: Difficulty; label: string }> = [
@@ -50,12 +60,8 @@ type BoardCell = {
 };
 
 function parseApiError(error: unknown) {
-  if (!error || typeof error !== 'object') {
-    return '请求失败';
-  }
-
-  const candidate = error as { error?: ApiErrorShape; message?: string };
-  return candidate.error?.detail ?? candidate.error?.message ?? candidate.message ?? '请求失败';
+  const normalized = normalizeApiError(error);
+  return normalized.detail ?? normalized.message;
 }
 
 async function requestJson<T>(url: string, init?: RequestInit) {
@@ -102,6 +108,18 @@ function formatDifficulty(value: Difficulty) {
   return DIFFICULTIES.find((item) => item.value === value)?.label ?? value;
 }
 
+function formatGameResult(game: GameSummary | null) {
+  if (!game) {
+    return '暂无进行中对局';
+  }
+
+  if (!game.resultWinner) {
+    return game.status === 'ONGOING' ? '未决' : '和局';
+  }
+
+  return game.resultWinner === game.userSide ? '你方领先' : 'AI 占优';
+}
+
 export function App() {
   const [username, setUsername] = useState('demo');
   const [password, setPassword] = useState('demo123');
@@ -113,9 +131,72 @@ export function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [profileName, setProfileName] = useState('');
+  const [theme, setTheme] = useState<ThemeKey>('classic');
+  const [discussionOpen, setDiscussionOpen] = useState(false);
+  const [compactLayout, setCompactLayout] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'narrative' | 'status' | 'settings'>('narrative');
+  const [eventFeed, setEventFeed] = useState<EventCard[]>([]);
+  const [revealedSegmentCounts, setRevealedSegmentCounts] = useState<Record<string, number>>({});
 
   const board = useMemo(() => (currentGame ? parseBoard(currentGame.currentFen) : []), [currentGame]);
   const hasOngoingGame = currentGame?.status === 'ONGOING';
+  const narrativeTurns = useMemo(() => buildNarrativeTurns(currentGame, theme), [currentGame, theme]);
+  const latestTurn = narrativeTurns.at(-1) ?? null;
+  const latestEvent = eventFeed[0] ?? null;
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 980px)');
+    const syncLayout = (matches: boolean) => {
+      setCompactLayout(matches);
+      setDiscussionOpen(!matches);
+      if (!matches) {
+        setMobilePanel('narrative');
+      }
+    };
+
+    syncLayout(mediaQuery.matches);
+    const listener = (event: MediaQueryListEvent) => syncLayout(event.matches);
+    mediaQuery.addEventListener('change', listener);
+    return () => mediaQuery.removeEventListener('change', listener);
+  }, []);
+
+  useEffect(() => {
+    if (!narrativeTurns.length) {
+      setRevealedSegmentCounts({});
+      return;
+    }
+
+    const latest = narrativeTurns.at(-1);
+    if (!latest) {
+      return;
+    }
+
+    setRevealedSegmentCounts((previous) => {
+      const next: Record<string, number> = {};
+      for (const turn of narrativeTurns.slice(0, -1)) {
+        next[turn.id] = turn.segments.length;
+      }
+      next[latest.id] = Math.min(previous[latest.id] ?? 1, latest.segments.length);
+      return next;
+    });
+
+    const timers = latest.segments.slice(1).map((_, index) => window.setTimeout(() => {
+      setRevealedSegmentCounts((previous) => ({
+        ...previous,
+        [latest.id]: Math.max(previous[latest.id] ?? 1, index + 2),
+      }));
+    }, 320 * (index + 1)));
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [narrativeTurns]);
+
+  function pushEvent(nextEvent: Omit<EventCard, 'id'> & { id?: string }) {
+    setEventFeed((previous) => [{ ...nextEvent, id: nextEvent.id ?? `${Date.now()}-${Math.random()}` }, ...previous].slice(0, 8));
+  }
 
   async function loadCurrentGame(nextToken: string) {
     const data = await requestJson<GetCurrentGameResponse>('/api/games/current', {
@@ -141,7 +222,7 @@ export function App() {
       setToken(data.token);
       setProfileName(data.user.username);
       await loadCurrentGame(data.token);
-      setMessage('登录成功，可以直接新开一局或继续已有对局。');
+      setMessage('登录成功，可以直接新开一局，或继续当前棋局。');
     } catch (loginError) {
       setToken('');
       setProfileName('');
@@ -172,9 +253,12 @@ export function App() {
 
       setCurrentGame(data.game);
       setSelectedSquare(null);
-      setMessage(`已创建 ${formatDifficulty(difficulty)} 对局，请先手落子。`);
+      setEventFeed([]);
+      setMessage(`已创建 ${formatDifficulty(difficulty)} 对局，讨论区会按回合逐段展开。`);
     } catch (createError) {
-      setError(parseApiError(createError));
+      const normalized = normalizeApiError(createError);
+      setError(normalized.detail ?? normalized.message);
+      pushEvent(buildErrorEvent(normalized));
     } finally {
       setActionLoading(false);
     }
@@ -195,7 +279,7 @@ export function App() {
 
     if (selectedSquare === square) {
       setSelectedSquare(null);
-      setMessage('已取消选择。');
+      setMessage('已取消当前选择。');
       return;
     }
 
@@ -220,10 +304,24 @@ export function App() {
 
       setCurrentGame(data.game);
       setSelectedSquare(null);
-      const aiPart = data.aiMove ? `，AI 应对 ${data.aiMove.from}→${data.aiMove.to}` : '，本步后对局已结束';
-      setMessage(`你已走 ${data.userMove.from}→${data.userMove.to}${aiPart}`);
+      if (compactLayout) {
+        setDiscussionOpen(false);
+        setMobilePanel('narrative');
+      }
+
+      const aiPart = data.aiMove ? `AI 应对 ${data.aiMove.from}→${data.aiMove.to}` : '本步后对局已结束';
+      setMessage(`你已走 ${data.userMove.from}→${data.userMove.to}，${aiPart}。`);
+
+      if (data.game.isCheck && data.game.status === 'ONGOING') {
+        pushEvent(buildCheckEvent(data.game));
+      }
+      if (data.game.status !== 'ONGOING') {
+        pushEvent(buildFinishEvent(data.game));
+      }
     } catch (moveError) {
-      setError(parseApiError(moveError));
+      const normalized = normalizeApiError(moveError);
+      setError(normalized.detail ?? normalized.message);
+      pushEvent(buildErrorEvent(normalized, `${selectedSquare} → ${square}`));
     } finally {
       setActionLoading(false);
     }
@@ -244,9 +342,12 @@ export function App() {
       });
       setCurrentGame(data.game);
       setSelectedSquare(null);
-      setMessage(`已撤销第 ${data.revertedTurnNumber} 回合，等待你重新落子。`);
+      setMessage(`已撤销第 ${data.revertedTurnNumber} 回合，轮到你重新落子。`);
+      pushEvent(buildUndoEvent(data.revertedTurnNumber));
     } catch (undoError) {
-      setError(parseApiError(undoError));
+      const normalized = normalizeApiError(undoError);
+      setError(normalized.detail ?? normalized.message);
+      pushEvent(buildErrorEvent(normalized));
     } finally {
       setActionLoading(false);
     }
@@ -268,8 +369,11 @@ export function App() {
       setCurrentGame(data.game);
       setSelectedSquare(null);
       setMessage('你已认输，本局结束。');
+      pushEvent(buildFinishEvent(data.game));
     } catch (resignError) {
-      setError(parseApiError(resignError));
+      const normalized = normalizeApiError(resignError);
+      setError(normalized.detail ?? normalized.message);
+      pushEvent(buildErrorEvent(normalized));
     } finally {
       setActionLoading(false);
     }
@@ -282,16 +386,172 @@ export function App() {
     setSelectedSquare(null);
     setMessage('');
     setError('');
+    setEventFeed([]);
+    setRevealedSegmentCounts({});
+  }
+
+  function renderStatusCard() {
+    return (
+      <section className="card info-card">
+        <div className="section-head">
+          <div>
+            <p className="section-kicker">当前对局</p>
+            <h2>状态与操作</h2>
+          </div>
+          {currentGame ? <span className={`state-pill ${currentGame.isCheck ? 'state-warning' : ''}`}>{STATUS_LABELS[currentGame.status]}</span> : null}
+        </div>
+
+        {currentGame ? (
+          <>
+            <ul className="status-list">
+              <li><strong>轮到：</strong>{currentGame.currentTurn === 'USER' ? '你' : currentGame.currentTurn === 'AI' ? 'AI' : '已结束'}</li>
+              <li><strong>难度：</strong>{formatDifficulty(currentGame.difficulty)}</li>
+              <li><strong>局势：</strong>{currentGame.isCheck && currentGame.status === 'ONGOING' ? '将军中' : formatGameResult(currentGame)}</li>
+              <li><strong>悔棋：</strong>{currentGame.undoCount}/5</li>
+              <li><strong>认输结束：</strong>{currentGame.endedByResign ? '是' : '否'}</li>
+            </ul>
+
+            <div className="action-row">
+              <button type="button" disabled={!currentGame.canUndo || actionLoading} onClick={() => void handleUndo()}>
+                撤销最近完整回合
+              </button>
+              <button type="button" disabled={currentGame.status !== 'ONGOING' || actionLoading} onClick={() => void handleResign()}>
+                认输
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="hint">暂无进行中对局。</p>
+        )}
+      </section>
+    );
+  }
+
+  function renderEventCard() {
+    return (
+      <section className="card info-card">
+        <div className="section-head">
+          <div>
+            <p className="section-kicker">特殊事件</p>
+            <h2>提示模板</h2>
+          </div>
+          <button className="ghost-button tiny-button" type="button" onClick={() => setEventFeed([])} disabled={!eventFeed.length}>
+            清空
+          </button>
+        </div>
+
+        {eventFeed.length ? (
+          <div className="event-list">
+            {eventFeed.map((item) => (
+              <article key={item.id} className={`event-card tone-${item.tone}`}>
+                <div className="event-head">
+                  <strong>{item.title}</strong>
+                  {item.meta ? <span>{item.meta}</span> : null}
+                </div>
+                <p>{item.body}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="hint">非法落子、悔棋、认输、将军、终局反馈会在这里按模板展示。</p>
+        )}
+      </section>
+    );
+  }
+
+  function renderNarrativeCard() {
+    return (
+      <section className="card info-card narrative-card">
+        <div className="section-head">
+          <div>
+            <p className="section-kicker">讨论区</p>
+            <h2>回合演绎</h2>
+          </div>
+          <span className="state-pill">{THEME_OPTIONS.find((item) => item.value === theme)?.label}</span>
+        </div>
+
+        {narrativeTurns.length ? (
+          <div className="narrative-list">
+            {narrativeTurns.slice().reverse().map((turn) => {
+              const visibleCount = revealedSegmentCounts[turn.id] ?? turn.segments.length;
+              const isLatestTurn = latestTurn?.id === turn.id;
+
+              return (
+                <article key={turn.id} className={`narrative-turn ${isLatestTurn ? 'narrative-turn-latest' : ''}`} aria-live={isLatestTurn ? 'polite' : undefined}>
+                  <header>
+                    <div>
+                      <strong>{turn.title}</strong>
+                      <span className="narrative-summary">{turn.summary}</span>
+                    </div>
+                    {isLatestTurn ? <span className="state-pill state-accent">逐段展开</span> : null}
+                  </header>
+                  <div className="narrative-segments">
+                    {turn.segments.map((segment, index) => {
+                      const visible = index < visibleCount;
+                      return (
+                        <div
+                          key={segment.id}
+                          className={[
+                            'narrative-segment',
+                            `segment-${segment.kind}`,
+                            visible ? 'segment-visible' : 'segment-pending',
+                          ].join(' ')}
+                        >
+                          <span className="segment-kind-label">{segment.label}</span>
+                          <span>{visible ? segment.text : segment.pendingText}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="hint">新开一局后，这里会按“第 N 回合”的结构逐段展开讨论与落子说明。</p>
+        )}
+      </section>
+    );
+  }
+
+  function renderSettingsCard() {
+    return (
+      <section className="card info-card">
+        <div className="section-head">
+          <div>
+            <p className="section-kicker">设置</p>
+            <h2>主题切换</h2>
+          </div>
+          <span className="state-pill">即时生效</span>
+        </div>
+
+        <div className="theme-grid" role="radiogroup" aria-label="页面主题切换">
+          {THEME_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`theme-chip ${theme === option.value ? 'theme-chip-active' : ''}`}
+              onClick={() => setTheme(option.value)}
+            >
+              <strong>{option.label}</strong>
+              <span>{option.hint}</span>
+            </button>
+          ))}
+        </div>
+
+        <p className="hint">当前只做展示层切换，不做登录后恢复与跨端同步。</p>
+      </section>
+    );
   }
 
   if (!token) {
     return (
       <main className="page-shell">
         <section className="hero-card">
-          <p className="eyebrow">Task Bundle B / 核心对局闭环</p>
-          <h1>象棋网页版 · 最小对局页</h1>
+          <p className="eyebrow">Task Bundle C / 体验层补全</p>
+          <h1>象棋网页版 · 演绎与移动端体验</h1>
           <p className="lead">
-            当前已补到“登录 → 新建对局 → 点击选子 → 点击目标点落子 → AI 合法应对 → 悔棋 / 认输”的最小闭环。
+            当前目标不再只是“能走棋”，而是把回合演绎、特殊事件模板、移动端主链路和主题切换一起补成更像成品的一版。
           </p>
         </section>
 
@@ -319,70 +579,96 @@ export function App() {
     <main className="page-shell game-page">
       <section className="hero-card hero-inline">
         <div>
-          <p className="eyebrow">Task Bundle B / 核心对局闭环</p>
+          <p className="eyebrow">Task Bundle C / 演绎展示与移动端体验</p>
           <h1>你好，{profileName}</h1>
-          <p className="lead">当前为最小棋盘页：新建对局、用户落子、AI 合法应对、悔棋与认输已经接通。</p>
+          <p className="lead">当前页面已切到体验层：回合演绎、事件模板、手机端折叠讨论区与三主题切换都在这里收口。</p>
         </div>
-        <button className="ghost-button" type="button" onClick={handleLogout}>退出登录</button>
+        <div className="hero-actions">
+          {compactLayout ? (
+            <button className="ghost-button" type="button" onClick={() => setDiscussionOpen((value) => !value)}>
+              {discussionOpen ? '收起讨论区' : '展开讨论区'}
+            </button>
+          ) : null}
+          <button className="ghost-button" type="button" onClick={handleLogout}>退出登录</button>
+        </div>
       </section>
 
       {message ? <p className="banner success">{message}</p> : null}
       {error ? <p className="banner error">{error}</p> : null}
 
       <section className="layout-grid">
-        <div className="card board-card">
-          <div className="board-head">
-            <div>
-              <h2>棋盘</h2>
-              <p className="hint">点击己方棋子后，再点击目标点完成落子。</p>
+        <div className="primary-column">
+          <div className="card board-card">
+            <div className="board-head">
+              <div>
+                <h2>棋盘</h2>
+                <p className="hint">点击己方棋子后，再点击目标点完成落子。移动端会优先保证棋盘可见。</p>
+              </div>
+              {currentGame ? (
+                <div className="meta-pills">
+                  <span>{STATUS_LABELS[currentGame.status]}</span>
+                  <span>{formatDifficulty(currentGame.difficulty)}</span>
+                  <span>{THEME_OPTIONS.find((item) => item.value === theme)?.label}</span>
+                  <span>悔棋 {currentGame.undoCount}/5</span>
+                </div>
+              ) : null}
             </div>
+
             {currentGame ? (
-              <div className="meta-pills">
-                <span>{STATUS_LABELS[currentGame.status]}</span>
-                <span>{formatDifficulty(currentGame.difficulty)}</span>
-                <span>悔棋 {currentGame.undoCount}/5</span>
+              <div className="board-grid" role="grid" aria-label="象棋棋盘">
+                {board.flat().map((cell, index) => {
+                  const isSelected = selectedSquare === cell.square;
+                  const userOwned = cell.piece ? pieceBelongsToUser(cell.piece, currentGame) : false;
+                  return (
+                    <button
+                      key={`${cell.square}-${index}`}
+                      type="button"
+                      className={[
+                        'board-cell',
+                        (index + Math.floor(index / 9)) % 2 === 0 ? 'dark-cell' : 'light-cell',
+                        isSelected ? 'selected-cell' : '',
+                      ].filter(Boolean).join(' ')}
+                      onClick={() => void handleBoardClick(cell.square, cell.piece)}
+                      disabled={actionLoading || currentGame.currentTurn !== 'USER' || currentGame.status !== 'ONGOING'}
+                    >
+                      <span className="cell-corner">{cell.square}</span>
+                      {cell.piece ? (
+                        <span className={`piece ${userOwned ? 'piece-red' : 'piece-black'}`}>
+                          {PIECE_LABELS[cell.piece] ?? cell.piece}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-board-state">
+                <p>当前没有进行中的对局，先从下方选择一个难度开始。</p>
+              </div>
+            )}
+
+            {compactLayout ? (
+              <div className="board-footnote">
+                <div>
+                  <p className="section-kicker">移动端提示</p>
+                  <strong>讨论区默认折叠，棋盘始终优先。</strong>
+                </div>
+                <button className="ghost-button tiny-button" type="button" onClick={() => setDiscussionOpen(true)}>
+                  查看讨论区
+                </button>
               </div>
             ) : null}
           </div>
 
-          {currentGame ? (
-            <div className="board-grid" role="grid" aria-label="象棋棋盘">
-              {board.flat().map((cell, index) => {
-                const isSelected = selectedSquare === cell.square;
-                const userOwned = cell.piece ? pieceBelongsToUser(cell.piece, currentGame) : false;
-                return (
-                  <button
-                    key={`${cell.square}-${index}`}
-                    type="button"
-                    className={[
-                      'board-cell',
-                      (index + Math.floor(index / 9)) % 2 === 0 ? 'dark-cell' : 'light-cell',
-                      isSelected ? 'selected-cell' : '',
-                    ].filter(Boolean).join(' ')}
-                    onClick={() => void handleBoardClick(cell.square, cell.piece)}
-                    disabled={actionLoading || currentGame.currentTurn !== 'USER' || currentGame.status !== 'ONGOING'}
-                  >
-                    <span className="cell-corner">{cell.square}</span>
-                    {cell.piece ? (
-                      <span className={`piece ${userOwned ? 'piece-red' : 'piece-black'}`}>
-                        {PIECE_LABELS[cell.piece] ?? cell.piece}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
+          <section className="card quick-actions-card">
+            <div className="section-head">
+              <div>
+                <p className="section-kicker">开局入口</p>
+                <h2>新建对局</h2>
+              </div>
+              {compactLayout ? <span className="state-pill">竖屏优先</span> : <span className="state-pill">横屏可侧边常驻</span>}
             </div>
-          ) : (
-            <div className="empty-board-state">
-              <p>当前没有进行中的对局，先从右侧选择一个难度开始。</p>
-            </div>
-          )}
-        </div>
-
-        <aside className="sidebar-stack">
-          <section className="card">
-            <h2>新建对局</h2>
-            <div className="difficulty-list">
+            <div className="difficulty-list difficulty-inline">
               {DIFFICULTIES.map((difficulty) => (
                 <button
                   key={difficulty.value}
@@ -397,48 +683,57 @@ export function App() {
             {hasOngoingGame ? (
               <p className="inline-notice">当前已有一局进行中的对局，请先继续当前棋局，或点“认输”结束后再新开。</p>
             ) : (
-              <p className="hint">可直接选择一个难度开始新局。</p>
+              <p className="hint">主题切换放在设置区，不占主操作区位置。</p>
             )}
           </section>
 
-          <section className="card">
-            <h2>当前对局状态</h2>
-            {currentGame ? (
-              <ul className="status-list">
-                <li><strong>状态：</strong>{STATUS_LABELS[currentGame.status]}</li>
-                <li><strong>轮到：</strong>{currentGame.currentTurn === 'USER' ? '你' : currentGame.currentTurn === 'AI' ? 'AI' : '已结束'}</li>
-                <li><strong>结果：</strong>{currentGame.resultWinner ? `${currentGame.resultWinner === currentGame.userSide ? '你方' : 'AI'}获胜` : '未决'}</li>
-                <li><strong>认输结束：</strong>{currentGame.endedByResign ? '是' : '否'}</li>
-              </ul>
+          {compactLayout && !discussionOpen ? (
+            <section className="card collapsed-summary-card">
+              <div>
+                <p className="section-kicker">折叠摘要</p>
+                <h2>{latestTurn?.title ?? latestEvent?.title ?? '暂时还没有新演绎'}</h2>
+                <p className="hint">{latestTurn?.summary ?? latestEvent?.body ?? '先完成一次落子，讨论区会在需要时再展开。'}</p>
+              </div>
+              <button type="button" onClick={() => setDiscussionOpen(true)}>展开查看</button>
+            </section>
+          ) : null}
+        </div>
+
+        {compactLayout ? (
+          <aside className="mobile-sidebar">
+            {!discussionOpen ? (
+              <section className="card collapsed-panel-card">
+                <p className="section-kicker">讨论区默认折叠</p>
+                <h2>先把棋盘留给你</h2>
+                <p className="hint">移动端默认收起讨论区，避免长期压住棋盘；需要时再展开查看回合演绎、状态和设置。</p>
+                <button type="button" onClick={() => setDiscussionOpen(true)}>展开讨论区</button>
+              </section>
             ) : (
-              <p className="hint">暂无进行中对局。</p>
+              <>
+                <div className="mobile-tab-row card">
+                  <button type="button" className={mobilePanel === 'narrative' ? 'tab-active' : ''} onClick={() => setMobilePanel('narrative')}>演绎</button>
+                  <button type="button" className={mobilePanel === 'status' ? 'tab-active' : ''} onClick={() => setMobilePanel('status')}>状态</button>
+                  <button type="button" className={mobilePanel === 'settings' ? 'tab-active' : ''} onClick={() => setMobilePanel('settings')}>设置</button>
+                </div>
+                {mobilePanel === 'narrative' ? renderNarrativeCard() : null}
+                {mobilePanel === 'status' ? (
+                  <>
+                    {renderStatusCard()}
+                    {renderEventCard()}
+                  </>
+                ) : null}
+                {mobilePanel === 'settings' ? renderSettingsCard() : null}
+              </>
             )}
-
-            <div className="action-row">
-              <button type="button" disabled={!currentGame?.canUndo || actionLoading} onClick={() => void handleUndo()}>
-                撤销最近完整回合
-              </button>
-              <button type="button" disabled={!currentGame || currentGame.status !== 'ONGOING' || actionLoading} onClick={() => void handleResign()}>
-                认输
-              </button>
-            </div>
-          </section>
-
-          <section className="card moves-card">
-            <h2>回合记录</h2>
-            {currentGame?.moves.length ? (
-              <ol>
-                {currentGame.moves.map((move) => (
-                  <li key={`${move.turnNumber}-${move.actor}-${move.from}-${move.to}`}>
-                    第 {move.turnNumber} 回合 · {move.actor === 'USER' ? '你' : 'AI'}：{move.from} → {move.to}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="hint">尚未落子。</p>
-            )}
-          </section>
-        </aside>
+          </aside>
+        ) : (
+          <aside className="sidebar-stack">
+            {renderStatusCard()}
+            {renderEventCard()}
+            {renderNarrativeCard()}
+            {renderSettingsCard()}
+          </aside>
+        )}
       </section>
     </main>
   );
