@@ -1,9 +1,9 @@
 # 象棋网页版项目
 
 ## 当前状态
-- 当前阶段：Implement（Task Bundle A 已完成回收并提交，待安排 Task Bundle B）
+- 当前阶段：Implement（Task Bundle B 范围已确认，待进入实现）
 - 当前锚点文档：`sdd-status.md`
-- 本轮重点：单仓全栈骨架、数据库初稿、用户名密码认证、规则适配层 baseline、新建/读取对局基础 API
+- 本轮重点：核心对局机械闭环、AI 合法应对、最小前端棋盘走通、悔棋 / 认输基础支持
 
 ## 当前目录结构
 - `apps/web/`：用户端 React + Vite 骨架，含登录链路验证页

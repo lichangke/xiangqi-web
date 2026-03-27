@@ -5,14 +5,14 @@
 - 当前状态：有效
 - 所属阶段：状态总览
 - 所属项目：象棋网页版项目（暂定）
-- 所属功能 / 子功能：Implement / Task Bundle A（基础框架与规则基线）
+- 所属功能 / 子功能：Implement / Task Bundle B（核心对局与 AI 主链路）
 - 上游文档：docs/需求分析结论.md
 - 创建时间：2026-03-26
 - 最后更新时间：2026-03-27
 
 ## 1. 当前阶段
-- 当前阶段：Implement（Task Bundle A 已回收确认并完成提交，待安排 Task Bundle B）
-- 当前阶段状态：Task Bundle A 已完成代码落地、验证、主会话回收与提交；当前下一步应在继续前确认 Task Bundle B 的执行范围
+- 当前阶段：Implement（Task Bundle B 范围已确认，待创建新的隔离实现会话）
+- 当前阶段状态：Task Bundle A 已完成回收与推送；Task Bundle B 的执行范围已确认，当前下一步应按新边界创建新的隔离实现会话
 
 ## 2. 各核心文档状态
 ### spec.md
@@ -33,7 +33,7 @@
 ### execution-contract.md
 - 状态：已创建（已确认）
 - 是否已确认：是
-- 备注：已完成 Task Bundle A 的执行协议收口，允许进入 Implement
+- 备注：已完成 Task Bundle B 的执行协议收口，允许进入下一次 Implement handoff
 
 ### review.md
 - 状态：未创建
@@ -42,22 +42,24 @@
 
 ## 3. 当前中断点
 ### 上次停在什么位置
-Task Bundle A 已由 subagent 完成首轮 Implement 落地；主会话已完成结果回收，并确认 `elephantops` baseline 可接受。
+Task Bundle A 已由主会话完成回收并推送远端；随后已完成 Task Bundle B 的范围确认。
 
 ### 为什么停下
-本轮回收到提交为止已完成；当前暂停点在于尚未继续拆解与启动 Task Bundle B。
+当前暂停点不在于范围不清，而在于尚未基于 Bundle B 边界创建新的隔离实现会话。
 
 ### 恢复时应先处理什么
-先阅读 `docs/Task Bundle A 实现记录.md` 与本状态卡，确认 Bundle A 的提交边界；随后进入 Task Bundle B 的范围确认与执行安排。
+先阅读本状态卡与 `execution-contract.md`，确认 Bundle B 的执行边界；随后创建新的隔离实现会话并进入 Implement。
 
 ## 4. 下一步唯一推荐动作
-进入 Task Bundle B 前的范围确认与执行安排。
+按已确认的 Task Bundle B 范围创建新的隔离实现会话。
 
 ## 5. 当前阻塞 / 未决问题
 - 当前无新的关键阻塞
 - 规则 baseline 已接受为 `elephantops` 适配落地；后续若需更贴近目标规则附录，可在保持业务层隔离的前提下替换实现
 
 ## 6. 最近执行痕迹摘要
+- [2026-03-27] 将 Task Bundle A 回收提交推送到远端仓库
+- [2026-03-27] 完成 Task Bundle B 范围确认，并将 execution-contract 切换到 Bundle B
 - [2026-03-26] 完成项目目录初始化
 - [2026-03-26] 写入 docs/需求分析结论.md
 - [2026-03-26] 写入 sdd-status.md
@@ -87,7 +89,7 @@ Task Bundle A 已由 subagent 完成首轮 Implement 落地；主会话已完成
 
 ## 7. 当前执行范围（Implement 阶段重点填写）
 ### 当前正在执行
-- 当前无进行中的实现任务；Task Bundle A 已回收提交完毕，待进入下一 bundle
+- 当前无进行中的实现任务；Task Bundle B 范围已确认，待创建新的隔离实现会话
 
 ### 当前已完成
 - 项目启动与需求讨论的第一轮收口
@@ -99,9 +101,12 @@ Task Bundle A 已由 subagent 完成首轮 Implement 落地；主会话已完成
 - Task Bundle A 代码实现：单仓骨架、数据库 schema 初稿、认证底座、规则适配层、规则测试、新建/读取对局基础接口
 - Task Bundle A 验证：自动化测试通过、全量构建通过、服务端运行态接口验证通过
 - Task Bundle A 主会话回收：已接受 `elephantops` baseline，并确认本轮可收口提交
+- Task Bundle A 远端同步：已推送到远端仓库
+- Task Bundle B 范围确认：已确认“核心对局机械闭环 + 最小前端走通”，不纳入演绎展示、移动端精修与后台配置闭环
 
 ### 当前未完成
 - Task Bundle B 实现执行
+- Task Bundle B 实现回收
 - 后续实现回收与 Review
 
 ### 当前验证情况
@@ -116,14 +121,14 @@ Task Bundle A 已由 subagent 完成首轮 Implement 落地；主会话已完成
 - 当前会话策略：单任务隔离
 - 当前 repo / cwd：xiangqi-web
 - 当前轮次：项目启动
-- 当前 task bundle：Task Bundle A（基础框架与规则基线）
-- 当前执行状态：implemented-recovered-and-committed
-- 最近一次执行结果：已完成首轮实现、验证、主会话回收与提交
-- 当前会话是否仍可复用：否（建议直接基于当前代码与文档继续）
+- 当前 task bundle：Task Bundle B（核心对局与 AI 主链路）
+- 当前执行状态：scope-confirmed-awaiting-handoff
+- 最近一次执行结果：Task Bundle B 范围已确认，待创建新的隔离实现会话
+- 当前会话是否仍可复用：否（应新建新的隔离实现会话）
 
 ## 9. 恢复提示
 默认恢复顺序：
 1. 先看本状态卡
-2. 再读 `docs/Task Bundle A 实现记录.md`
-3. 若需恢复上下文，再读 docs/需求分析结论.md 与已确认的 spec.md、plan.md、tasks.md、execution-contract.md
-4. 直接进入 Task Bundle B 的范围确认与执行安排
+2. 再读 `execution-contract.md`
+3. 若需恢复上下文，再读 docs/需求分析结论.md 与已确认的 spec.md、plan.md、tasks.md
+4. 直接按已确认的 Task Bundle B 范围创建新的隔离实现会话
