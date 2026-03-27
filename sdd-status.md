@@ -11,8 +11,8 @@
 - 最后更新时间：2026-03-27
 
 ## 1. 当前阶段
-- 当前阶段：Implement（Task Bundle B 范围已确认，待创建新的隔离实现会话）
-- 当前阶段状态：Task Bundle A 已完成回收与推送；Task Bundle B 的执行范围已确认，当前下一步应按新边界创建新的隔离实现会话
+- 当前阶段：Implement（Task Bundle B 已交给新的隔离实现会话执行）
+- 当前阶段状态：Task Bundle A 已完成回收与推送；Task Bundle B 已按确认边界交给新的隔离实现会话，当前应等待实现结果返回后再做回收
 
 ## 2. 各核心文档状态
 ### spec.md
@@ -45,13 +45,13 @@
 Task Bundle A 已由主会话完成回收并推送远端；随后已完成 Task Bundle B 的范围确认。
 
 ### 为什么停下
-当前暂停点不在于范围不清，而在于尚未基于 Bundle B 边界创建新的隔离实现会话。
+当前主会话已完成 handoff；暂停点在于等待隔离实现会话返回 Bundle B 的实现结果。
 
 ### 恢复时应先处理什么
-先阅读本状态卡与 `execution-contract.md`，确认 Bundle B 的执行边界；随后创建新的隔离实现会话并进入 Implement。
+先看本状态卡与隔离实现会话的返回结果；随后做 Bundle B 的结果回收、验证复核与状态回写。
 
 ## 4. 下一步唯一推荐动作
-按已确认的 Task Bundle B 范围创建新的隔离实现会话。
+等待隔离实现会话返回 Task Bundle B 结果，并在主会话中完成回收。
 
 ## 5. 当前阻塞 / 未决问题
 - 当前无新的关键阻塞
@@ -60,6 +60,7 @@ Task Bundle A 已由主会话完成回收并推送远端；随后已完成 Task 
 ## 6. 最近执行痕迹摘要
 - [2026-03-27] 将 Task Bundle A 回收提交推送到远端仓库
 - [2026-03-27] 完成 Task Bundle B 范围确认，并将 execution-contract 切换到 Bundle B
+- [2026-03-27] 已创建新的隔离实现会话并交付 Task Bundle B
 - [2026-03-26] 完成项目目录初始化
 - [2026-03-26] 写入 docs/需求分析结论.md
 - [2026-03-26] 写入 sdd-status.md
@@ -89,7 +90,7 @@ Task Bundle A 已由主会话完成回收并推送远端；随后已完成 Task 
 
 ## 7. 当前执行范围（Implement 阶段重点填写）
 ### 当前正在执行
-- 当前无进行中的实现任务；Task Bundle B 范围已确认，待创建新的隔离实现会话
+- Task Bundle B 已交给新的隔离实现会话执行，当前主会话等待结果回收
 
 ### 当前已完成
 - 项目启动与需求讨论的第一轮收口
@@ -122,13 +123,14 @@ Task Bundle A 已由主会话完成回收并推送远端；随后已完成 Task 
 - 当前 repo / cwd：xiangqi-web
 - 当前轮次：项目启动
 - 当前 task bundle：Task Bundle B（核心对局与 AI 主链路）
-- 当前执行状态：scope-confirmed-awaiting-handoff
-- 最近一次执行结果：Task Bundle B 范围已确认，待创建新的隔离实现会话
-- 当前会话是否仍可复用：否（应新建新的隔离实现会话）
+- 当前执行状态：handed-off-in-progress
+- 最近一次执行结果：已创建新的隔离实现会话并开始执行 Task Bundle B
+- 当前会话是否仍可复用：否（等待当前隔离实现会话返回后再决定下一步）
 
 ## 9. 恢复提示
 默认恢复顺序：
 1. 先看本状态卡
-2. 再读 `execution-contract.md`
-3. 若需恢复上下文，再读 docs/需求分析结论.md 与已确认的 spec.md、plan.md、tasks.md
-4. 直接按已确认的 Task Bundle B 范围创建新的隔离实现会话
+2. 再看隔离实现会话返回结果
+3. 再读 `execution-contract.md`
+4. 若需恢复上下文，再读 docs/需求分析结论.md 与已确认的 spec.md、plan.md、tasks.md
+5. 在主会话中完成 Task Bundle B 结果回收
