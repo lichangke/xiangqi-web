@@ -72,6 +72,14 @@ input {
 .banner { margin-top: 18px; padding: 14px 18px; }
 .banner.success { border-color: rgba(110, 231, 183, 0.35); }
 .banner.error { border-color: rgba(248, 113, 113, 0.35); }
+.inline-notice {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(251, 191, 36, 0.24);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fde68a;
+}
 
 .grid {
   margin-top: 24px;

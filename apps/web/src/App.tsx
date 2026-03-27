@@ -115,6 +115,7 @@ export function App() {
   const [profileName, setProfileName] = useState('');
 
   const board = useMemo(() => (currentGame ? parseBoard(currentGame.currentFen) : []), [currentGame]);
+  const hasOngoingGame = currentGame?.status === 'ONGOING';
 
   async function loadCurrentGame(nextToken: string) {
     const data = await requestJson<GetCurrentGameResponse>('/api/games/current', {
@@ -386,14 +387,18 @@ export function App() {
                 <button
                   key={difficulty.value}
                   type="button"
-                  disabled={actionLoading || currentGame?.status === 'ONGOING'}
+                  disabled={actionLoading || hasOngoingGame}
                   onClick={() => void handleCreateGame(difficulty.value)}
                 >
                   {difficulty.label}
                 </button>
               ))}
             </div>
-            <p className="hint">存在进行中对局时会阻止重复新开。</p>
+            {hasOngoingGame ? (
+              <p className="inline-notice">当前已有一局进行中的对局，请先继续当前棋局，或点“认输”结束后再新开。</p>
+            ) : (
+              <p className="hint">可直接选择一个难度开始新局。</p>
+            )}
           </section>
 
           <section className="card">
