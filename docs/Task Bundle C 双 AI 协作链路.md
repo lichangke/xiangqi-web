@@ -181,8 +181,8 @@ V1 已确认采用 **双 AI、双上下文、双职责** 的结构：
 本文件是对以下文档的落地补充：
 - Task Bundle C AI 演绎升级方案
 - Task Bundle C 剧情圣经草案
-- Task Bundle C 演绎输入输出契约草案
-- Task Bundle C 成本与调用策略草案
+- Task Bundle C 演绎输入输出契约
+- Task Bundle C 成本与调用策略
 
 它不替代这些文档，而是把“系统如何协作”单独说清楚。
 
