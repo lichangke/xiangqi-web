@@ -1,6 +1,14 @@
-import { Difficulty, GameStatus, type PrismaClient } from '@prisma/client';
-import type { RuleAdapter } from '../rules/types.js';
+import { Difficulty, GameStatus, type GameSession, type PrismaClient } from '@prisma/client';
+import type { GameActor } from '@xiangqi-web/shared';
+import { SimpleAiStrategy } from '../ai/strategy/simple-ai-strategy.js';
+import type { MoveInput, RuleAdapter } from '../rules/types.js';
 import { HttpError } from '../../utils/http-error.js';
+import {
+  parseMoveHistory,
+  serializeMoveHistory,
+  toGameSummary,
+  type PersistedMoveRecord,
+} from './types.js';
 
 function assertDifficulty(value: string): Difficulty {
   if (Object.values(Difficulty).includes(value as Difficulty)) {
@@ -10,11 +18,27 @@ function assertDifficulty(value: string): Difficulty {
   throw new HttpError(400, 'GAME_BAD_REQUEST', '不支持的难度档位');
 }
 
+function deriveStatus(summary: { isCheckmate: boolean; isStalemate: boolean; isGameOver: boolean }) {
+  if (summary.isCheckmate) {
+    return GameStatus.CHECKMATED;
+  }
+
+  if (summary.isStalemate || summary.isGameOver) {
+    return GameStatus.STALEMATE;
+  }
+
+  return GameStatus.ONGOING;
+}
+
 export class GameService {
+  private readonly aiStrategy: SimpleAiStrategy;
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly rules: RuleAdapter,
-  ) {}
+  ) {
+    this.aiStrategy = new SimpleAiStrategy(rules);
+  }
 
   async createGame(userId: string, difficultyValue: string) {
     const difficulty = assertDifficulty(difficultyValue);
@@ -32,7 +56,7 @@ export class GameService {
     }
 
     const fen = this.rules.getInitialFen();
-    return this.prisma.gameSession.create({
+    const game = await this.prisma.gameSession.create({
       data: {
         userId,
         difficulty,
@@ -41,15 +65,202 @@ export class GameService {
         currentFen: fen,
       },
     });
+
+    return this.buildGameView(game);
   }
 
   async getCurrentGame(userId: string) {
-    return this.prisma.gameSession.findFirst({
+    const game = await this.prisma.gameSession.findFirst({
       where: {
         userId,
         status: GameStatus.ONGOING,
       },
       orderBy: { updatedAt: 'desc' },
     });
+
+    if (!game) {
+      return null;
+    }
+
+    return this.buildGameView(game);
+  }
+
+  async submitMove(userId: string, gameId: string, input: MoveInput) {
+    const game = await this.getOwnedGame(userId, gameId);
+    if (game.status !== GameStatus.ONGOING) {
+      throw new HttpError(409, 'GAME_NOT_ACTIVE', '当前对局已结束，不能继续落子');
+    }
+
+    const userMoveResult = this.rules.applyMove(game.currentFen, input);
+    if (!userMoveResult.ok) {
+      throw new HttpError(422, 'ILLEGAL_MOVE', '这步棋不合棋规', userMoveResult.reason);
+    }
+
+    const history = parseMoveHistory(game.moveHistory);
+    const turnNumber = Math.floor(history.length / 2) + 1;
+    const userMoveRecord = this.createMoveRecord('USER', turnNumber, game.currentFen, userMoveResult.nextFen, userMoveResult.move);
+
+    if (userMoveResult.summary.isGameOver) {
+      const updatedGame = await this.prisma.gameSession.update({
+        where: { id: game.id },
+        data: {
+          currentFen: userMoveResult.nextFen,
+          moveHistory: serializeMoveHistory([...history, userMoveRecord]),
+          status: deriveStatus(userMoveResult.summary),
+          resultWinner: userMoveResult.summary.isCheckmate ? game.userSide : null,
+          canUndo: false,
+          endedByResign: false,
+          endedAt: new Date(),
+        },
+      });
+
+      const view = this.buildGameView(updatedGame);
+      return {
+        game: view,
+        userMove: this.toPublicMove(userMoveRecord),
+        aiMove: null,
+      };
+    }
+
+    const aiDecision = this.aiStrategy.chooseMove(userMoveResult.nextFen, game.difficulty);
+    const aiMoveResult = this.rules.applyMove(userMoveResult.nextFen, aiDecision.move);
+    if (!aiMoveResult.ok) {
+      throw new HttpError(500, 'AI_ILLEGAL_MOVE', 'AI 候选步异常，未能生成合法应对');
+    }
+
+    const aiMoveRecord = this.createMoveRecord('AI', turnNumber, userMoveResult.nextFen, aiMoveResult.nextFen, aiMoveResult.move);
+    const finalStatus = deriveStatus(aiMoveResult.summary);
+    const updatedGame = await this.prisma.gameSession.update({
+      where: { id: game.id },
+      data: {
+        currentFen: aiMoveResult.nextFen,
+        moveHistory: serializeMoveHistory([...history, userMoveRecord, aiMoveRecord]),
+        status: finalStatus,
+        resultWinner: finalStatus === GameStatus.CHECKMATED ? game.aiSide : null,
+        canUndo: true,
+        endedByResign: false,
+        endedAt: finalStatus === GameStatus.ONGOING ? null : new Date(),
+      },
+    });
+
+    return {
+      game: this.buildGameView(updatedGame),
+      userMove: this.toPublicMove(userMoveRecord),
+      aiMove: this.toPublicMove(aiMoveRecord),
+    };
+  }
+
+  async undoLastRound(userId: string, gameId: string) {
+    const game = await this.getOwnedGame(userId, gameId);
+    const policy = await this.prisma.runtimePolicy.findUnique({ where: { policyKey: 'system' } });
+    const maxUndo = policy?.maxUndoPerGame ?? 5;
+
+    if (game.undoCount >= maxUndo) {
+      throw new HttpError(409, 'GAME_UNDO_LIMIT', '本局悔棋次数已用尽');
+    }
+
+    if (!game.canUndo) {
+      throw new HttpError(409, 'GAME_UNDO_NOT_AVAILABLE', '当前不能连续悔棋，请先完成一次新的正常落子');
+    }
+
+    const history = parseMoveHistory(game.moveHistory);
+    const aiMove = history.at(-1);
+    const userMove = history.at(-2);
+
+    if (!aiMove || !userMove || aiMove.actor !== 'AI' || userMove.actor !== 'USER' || aiMove.turnNumber !== userMove.turnNumber) {
+      throw new HttpError(409, 'GAME_UNDO_NOT_AVAILABLE', '当前没有可撤销的完整回合');
+    }
+
+    const revertedHistory = history.slice(0, -2);
+    const updatedGame = await this.prisma.gameSession.update({
+      where: { id: game.id },
+      data: {
+        currentFen: userMove.fenBefore,
+        moveHistory: serializeMoveHistory(revertedHistory),
+        undoCount: game.undoCount + 1,
+        canUndo: false,
+        status: GameStatus.ONGOING,
+        resultWinner: null,
+        endedByResign: false,
+        endedAt: null,
+      },
+    });
+
+    return {
+      game: this.buildGameView(updatedGame),
+      revertedTurnNumber: userMove.turnNumber,
+    };
+  }
+
+  async resignGame(userId: string, gameId: string) {
+    const game = await this.getOwnedGame(userId, gameId);
+    if (game.status !== GameStatus.ONGOING) {
+      throw new HttpError(409, 'GAME_NOT_ACTIVE', '当前对局已结束，无法认输');
+    }
+
+    const updatedGame = await this.prisma.gameSession.update({
+      where: { id: game.id },
+      data: {
+        status: GameStatus.RESIGNED,
+        resultWinner: game.aiSide,
+        endedByResign: true,
+        canUndo: false,
+        endedAt: new Date(),
+      },
+    });
+
+    return this.buildGameView(updatedGame);
+  }
+
+  private async getOwnedGame(userId: string, gameId: string) {
+    const game = await this.prisma.gameSession.findFirst({
+      where: {
+        id: gameId,
+        userId,
+      },
+    });
+
+    if (!game) {
+      throw new HttpError(404, 'GAME_NOT_FOUND', '未找到指定对局');
+    }
+
+    return game;
+  }
+
+  private buildGameView(game: GameSession) {
+    const history = parseMoveHistory(game.moveHistory);
+    const currentTurn = game.status === GameStatus.ONGOING
+      ? (this.rules.getGameState(game.currentFen).nextTurn === 'r' ? 'USER' : 'AI')
+      : null;
+
+    return toGameSummary(game, history, currentTurn);
+  }
+
+  private createMoveRecord(
+    actor: GameActor,
+    turnNumber: number,
+    fenBefore: string,
+    fenAfter: string,
+    move: { from: string; to: string; san?: string },
+  ): PersistedMoveRecord {
+    return {
+      actor,
+      turnNumber,
+      fenBefore,
+      fenAfter,
+      from: move.from,
+      to: move.to,
+      san: move.san,
+    };
+  }
+
+  private toPublicMove(move: PersistedMoveRecord) {
+    return {
+      actor: move.actor,
+      turnNumber: move.turnNumber,
+      from: move.from,
+      to: move.to,
+      san: move.san,
+    };
   }
 }

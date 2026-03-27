@@ -34,10 +34,24 @@ export type CreateGameRequest = {
   difficulty: Difficulty;
 };
 
+export type MoveRequest = {
+  from: string;
+  to: string;
+};
+
 export type RuleMove = {
   from: string;
   to: string;
   san?: string;
+};
+
+export type GameActor = 'USER' | 'AI';
+export type SideColor = 'red' | 'black';
+export type PlayerTurn = GameActor | null;
+
+export type GameMoveRecord = RuleMove & {
+  actor: GameActor;
+  turnNumber: number;
 };
 
 export type GameSummary = {
@@ -46,9 +60,39 @@ export type GameSummary = {
   difficulty: Difficulty;
   currentFen: string;
   undoCount: number;
-  moves: RuleMove[];
+  canUndo: boolean;
+  moves: GameMoveRecord[];
+  userSide: SideColor;
+  aiSide: SideColor;
+  currentTurn: PlayerTurn;
+  resultWinner: SideColor | null;
+  endedByResign: boolean;
   startedAt: string;
   updatedAt: string;
+  endedAt: string | null;
+};
+
+export type CreateGameResponse = {
+  game: GameSummary;
+};
+
+export type GetCurrentGameResponse = {
+  game: GameSummary | null;
+};
+
+export type SubmitMoveResponse = {
+  game: GameSummary;
+  userMove: GameMoveRecord;
+  aiMove: GameMoveRecord | null;
+};
+
+export type UndoGameResponse = {
+  game: GameSummary;
+  revertedTurnNumber: number;
+};
+
+export type ResignGameResponse = {
+  game: GameSummary;
 };
 
 export type ApiErrorShape = {

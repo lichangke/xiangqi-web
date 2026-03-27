@@ -2,9 +2,11 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { buildApp } from '../../apps/server/src/app.js';
+import { XiangqiRuleAdapter } from '../../apps/server/src/domain/rules/xiangqi-rule-adapter.js';
 
 const prisma = new PrismaClient();
 const app = buildApp({ prisma });
+const rules = new XiangqiRuleAdapter();
 
 let adminToken = '';
 let demoToken = '';
@@ -21,6 +23,18 @@ async function login(username: string, password: string) {
   return response.json();
 }
 
+async function createGame() {
+  const response = await app.inject({
+    method: 'POST',
+    url: '/api/games',
+    headers: { authorization: `Bearer ${demoToken}` },
+    payload: { difficulty: 'NORMAL' },
+  });
+
+  expect(response.statusCode).toBe(201);
+  return response.json().game as { id: string; currentFen: string; status: string; canUndo: boolean };
+}
+
 beforeAll(async () => {
   await app.ready();
 });
@@ -32,7 +46,7 @@ beforeEach(async () => {
   await prisma.user.deleteMany();
   await prisma.runtimePolicy.upsert({
     where: { policyKey: 'system' },
-    update: { maxOngoingGamesPerUser: 1 },
+    update: { maxOngoingGamesPerUser: 1, maxUndoPerGame: 5 },
     create: {
       policyKey: 'system',
       maxConcurrentAiGames: 20,
@@ -82,15 +96,7 @@ describe('auth and game APIs', () => {
   });
 
   it('should create a game and then read current ongoing game', async () => {
-    const create = await app.inject({
-      method: 'POST',
-      url: '/api/games',
-      headers: { authorization: `Bearer ${demoToken}` },
-      payload: { difficulty: 'NORMAL' },
-    });
-
-    expect(create.statusCode).toBe(201);
-    expect(create.json().game.status).toBe('ONGOING');
+    const createdGame = await createGame();
 
     const current = await app.inject({
       method: 'GET',
@@ -99,8 +105,9 @@ describe('auth and game APIs', () => {
     });
 
     expect(current.statusCode).toBe(200);
-    expect(current.json().game.id).toBe(create.json().game.id);
+    expect(current.json().game.id).toBe(createdGame.id);
     expect(current.json().game.currentFen).toBeTruthy();
+    expect(current.json().game.currentTurn).toBe('USER');
   });
 
   it('should reject login with wrong password', async () => {
@@ -146,5 +153,134 @@ describe('auth and game APIs', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json().error.code).toBe('GAME_ALREADY_ONGOING');
+  });
+
+  it('should apply a legal user move and then let AI answer with a legal move', async () => {
+    const createdGame = await createGame();
+    const userMove = rules.getLegalMoves(createdGame.currentFen)[0];
+    expect(userMove).toBeTruthy();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/games/${createdGame.id}/moves`,
+      headers: { authorization: `Bearer ${demoToken}` },
+      payload: { from: userMove.from, to: userMove.to },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().userMove.from).toBe(userMove.from);
+    expect(response.json().aiMove).toBeTruthy();
+    expect(response.json().game.currentFen).not.toBe(createdGame.currentFen);
+    expect(response.json().game.canUndo).toBe(true);
+
+    const storedGame = await prisma.gameSession.findUniqueOrThrow({ where: { id: createdGame.id } });
+    const history = JSON.parse(storedGame.moveHistory) as Array<{ actor: string; from: string; to: string; fenBefore: string }>;
+    expect(history).toHaveLength(2);
+    expect(history[0].actor).toBe('USER');
+    expect(history[1].actor).toBe('AI');
+    expect(rules.validateMove(history[1].fenBefore, { from: history[1].from, to: history[1].to }).ok).toBe(true);
+  });
+
+  it('should reject illegal moves without polluting game state', async () => {
+    const createdGame = await createGame();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/games/${createdGame.id}/moves`,
+      headers: { authorization: `Bearer ${demoToken}` },
+      payload: { from: 'a1', to: 'a4' },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe('ILLEGAL_MOVE');
+
+    const storedGame = await prisma.gameSession.findUniqueOrThrow({ where: { id: createdGame.id } });
+    expect(storedGame.currentFen).toBe(createdGame.currentFen);
+    expect(JSON.parse(storedGame.moveHistory)).toEqual([]);
+    expect(storedGame.status).toBe('ONGOING');
+  });
+
+  it('should support undo for the latest full round and block consecutive undo', async () => {
+    const createdGame = await createGame();
+    const userMove = rules.getLegalMoves(createdGame.currentFen)[0];
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/games/${createdGame.id}/moves`,
+      headers: { authorization: `Bearer ${demoToken}` },
+      payload: { from: userMove.from, to: userMove.to },
+    });
+
+    const undo = await app.inject({
+      method: 'POST',
+      url: `/api/games/${createdGame.id}/undo`,
+      headers: { authorization: `Bearer ${demoToken}` },
+    });
+
+    expect(undo.statusCode).toBe(200);
+    expect(undo.json().game.currentFen).toBe(createdGame.currentFen);
+    expect(undo.json().game.undoCount).toBe(1);
+    expect(undo.json().game.canUndo).toBe(false);
+
+    const secondUndo = await app.inject({
+      method: 'POST',
+      url: `/api/games/${createdGame.id}/undo`,
+      headers: { authorization: `Bearer ${demoToken}` },
+    });
+
+    expect(secondUndo.statusCode).toBe(409);
+    expect(secondUndo.json().error.code).toBe('GAME_UNDO_NOT_AVAILABLE');
+  });
+
+  it('should allow resign and clear current ongoing game lookup', async () => {
+    const createdGame = await createGame();
+
+    const resign = await app.inject({
+      method: 'POST',
+      url: `/api/games/${createdGame.id}/resign`,
+      headers: { authorization: `Bearer ${demoToken}` },
+    });
+
+    expect(resign.statusCode).toBe(200);
+    expect(resign.json().game.status).toBe('RESIGNED');
+    expect(resign.json().game.endedByResign).toBe(true);
+
+    const current = await app.inject({
+      method: 'GET',
+      url: '/api/games/current',
+      headers: { authorization: `Bearer ${demoToken}` },
+    });
+
+    expect(current.statusCode).toBe(200);
+    expect(current.json().game).toBeNull();
+  });
+
+  it('should keep AI replies legal across multiple rounds', async () => {
+    const createdGame = await createGame();
+    let currentFen = createdGame.currentFen;
+
+    for (let round = 0; round < 4; round += 1) {
+      const legalUserMove = rules.getLegalMoves(currentFen)[0];
+      expect(legalUserMove).toBeTruthy();
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/games/${createdGame.id}/moves`,
+        headers: { authorization: `Bearer ${demoToken}` },
+        payload: { from: legalUserMove.from, to: legalUserMove.to },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const storedGame = await prisma.gameSession.findUniqueOrThrow({ where: { id: createdGame.id } });
+      const history = JSON.parse(storedGame.moveHistory) as Array<{ actor: string; from: string; to: string; fenBefore: string }>;
+      const aiMove = history.at(-1);
+      expect(aiMove?.actor).toBe('AI');
+      expect(rules.validateMove(aiMove!.fenBefore, { from: aiMove!.from, to: aiMove!.to }).ok).toBe(true);
+
+      currentFen = storedGame.currentFen;
+      if (storedGame.status !== 'ONGOING') {
+        break;
+      }
+    }
   });
 });

@@ -1,7 +1,7 @@
 # 象棋网页版项目
 
 ## 当前状态
-- 当前阶段：Implement（Task Bundle B 范围已确认，待进入实现）
+- 当前阶段：Implement（Task Bundle B 已完成回收并提交，待确认 Task Bundle C）
 - 当前锚点文档：`sdd-status.md`
 - 本轮重点：核心对局机械闭环、AI 合法应对、最小前端棋盘走通、悔棋 / 认输基础支持
 
