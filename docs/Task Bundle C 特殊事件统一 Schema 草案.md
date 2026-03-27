@@ -230,7 +230,7 @@ V1 固定枚举：
 }
 ```
 
-### 第一版建议的 finishReason
+### 第一版已确认的 finishReason
 - `checkmate`
 - `resign`
 - `rule_settlement`
@@ -265,7 +265,7 @@ V1 固定枚举：
 ### 原则
 - 事件项仍然走统一时间线
 - 只是 `kind=event`
-- 前端可按 `eventType` 轻微调整视觉权重，但不另起一套展示系统
+- V1 前端不对 `illegal_move / undo / finish` 额外抬高视觉权重，也不另起一套展示系统
 
 ## 10. fallback 建议
 如果事件演绎生成失败：
@@ -342,13 +342,17 @@ V1 固定枚举：
 4. fallback 下仍能产出完整事件项
 5. 不同事件类型不会因为共用 Schema 而互相污染字段含义
 
-## 13. 当前待确认事项
-1. `finishReason` 第一版是否只保留 `checkmate / resign / rule_settlement`
-2. `eventSemanticTag` 是否要收敛成固定枚举表并单独成文
-3. `extensions` 是否要进一步限制成按事件类型的白名单字段
-4. 前端是否需要对 `illegal_move / undo / finish` 设置更高视觉权重
+## 13. 本轮已确认事项
+1. `finishReason` 第一版只保留 `checkmate / resign / rule_settlement`
+2. `eventSemanticTag` 需要收敛成固定枚举表，并单独成文维护
+3. `extensions` 这一版先不进一步限制成按事件类型的白名单字段
+4. V1 前端不对 `illegal_move / undo / finish` 设置更高视觉权重
 
-## 14. 当前结论
+## 14. 当前待确认事项
+1. 后续若新增 `draw / timeout / reconnect_notice`，是否全部继续沿用当前统一主干 Schema
+2. `extensions` 在后续版本是否需要再收紧成按事件类型的白名单字段
+
+## 15. 当前结论
 本草案的核心结论是：
 
 > Task Bundle C 的特殊事件在 V1 中应采用“统一主干 Schema + 少量按类型扩展字段”的方式接入演绎链路，从而保证非法步、悔棋、将军、认输、终局都能稳定进入同一时间线，并被演绎 AI 以受控方式生成事件文本。
