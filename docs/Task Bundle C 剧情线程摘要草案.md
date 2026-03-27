@@ -240,12 +240,12 @@ V1 先采用 **方案 A：系统规则化更新**。
 1. `storyThreadSummary` 默认控制在 80～150 字，上限不超过 200 字
 2. 不直接保留最近 N 回合全文，只保留 1 份当前线程状态摘要
 3. 该摘要由最近 2～4 回合滚动更新形成
+4. `currentPhase` 第一版保留 5 档，不进一步压缩到 4 档
+5. `carryForward` 作为 V1 必填字段
 
 ## 13. 当前待确认事项
-1. `currentPhase` 是否保留 5 档，还是进一步压缩到 4 档
-2. `carryForward` 是否作为 V1 必填字段
-3. V1 是否允许 `storyThreadSummary` 由轻量 AI 辅助润色，还是完全系统生成
-4. `recentFocus` 是否应限制为固定枚举，而不是短文本
+1. V1 是否允许 `storyThreadSummary` 由轻量 AI 辅助润色，还是完全系统生成
+2. `recentFocus` 是否应限制为固定枚举，而不是短文本
 
 ## 14. 当前结论
 本草案的核心结论是：
