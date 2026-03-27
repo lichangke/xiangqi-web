@@ -79,17 +79,17 @@
 
 ### 权威输入
 - 必读文档：
-  - spec: /root/.openclaw/workspace/xiangqi-web/spec.md
-  - plan: /root/.openclaw/workspace/xiangqi-web/plan.md
-  - tasks: /root/.openclaw/workspace/xiangqi-web/tasks.md
-  - execution-contract: /root/.openclaw/workspace/xiangqi-web/execution-contract.md
-  - sdd-status: /root/.openclaw/workspace/xiangqi-web/sdd-status.md
+  - spec: spec.md
+  - plan: plan.md
+  - tasks: tasks.md
+  - execution-contract: execution-contract.md
+  - sdd-status: sdd-status.md
 - 补充材料：
-  - /root/.openclaw/workspace/xiangqi-web/docs/需求分析结论.md
+  - docs/需求分析结论.md
 - 若历史上下文与上述文档冲突，以本文档列出的权威输入为准。
 
 ### 修改边界
-- 当前 repo / cwd：/root/.openclaw/workspace/xiangqi-web
+- 当前 repo / cwd：xiangqi-web
 - 允许修改目录 / 文件：
   - `src/`
   - `tests/`

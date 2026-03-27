@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ENABLED
+  DISABLED
+}
+
+enum Difficulty {
+  BEGINNER
+  NORMAL
+  HARD
+  MASTER
+}
+
+enum GameStatus {
+  ONGOING
+  CHECKMATED
+  STALEMATE
+  RESIGNED
+  DRAW
+}
+
+enum RegistrationMode {
+  CLOSED
+  INVITE_ONLY
+  OPEN
+}
+
+model User {
+  id               String         @id @default(cuid())
+  username         String         @unique
+  passwordHash     String
+  role             UserRole       @default(USER)
+  status           UserStatus     @default(ENABLED)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  preferences      UserPreference?
+  gameSessions     GameSession[]
+  createdAuditLogs AuditLog[]     @relation("AuditActor")
+}
+
+model UserPreference {
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  theme                    String   @default("classic")
+  boardOrientation         String   @default("red-bottom")
+  discussionDefaultOpen    Boolean  @default(false)
+  narrativeStylePreference String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GameSession {
+  id             String      @id @default(cuid())
+  userId         String
+  difficulty     Difficulty
+  status         GameStatus  @default(ONGOING)
+  initialFen     String
+  currentFen     String
+  moveHistory    String      @default("[]")
+  undoCount      Int         @default(0)
+  canUndo        Boolean     @default(false)
+  userSide       String      @default("red")
+  aiSide         String      @default("black")
+  resultWinner   String?
+  endedByResign  Boolean     @default(false)
+  startedAt      DateTime    @default(now())
+  endedAt        DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model ModelConfig {
+  id               String   @id @default(cuid())
+  configKey        String   @unique
+  modelName        String
+  baseUrl          String
+  apiKeyMaskedHint String
+  thinkingLevel    String   @default("normal")
+  enabled          Boolean  @default(false)
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model RuntimePolicy {
+  id                     String           @id @default(cuid())
+  policyKey              String           @unique @default("system")
+  maxConcurrentAiGames   Int              @default(20)
+  maxOngoingGamesPerUser Int              @default(1)
+  registrationMode       RegistrationMode @default(CLOSED)
+  maxUndoPerGame         Int              @default(5)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorUserId String?
+  action     String
+  targetType String
+  targetId   String?
+  summary    String
+  payload    String?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId])
+}

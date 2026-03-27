@@ -1,0 +1,28 @@
+{
+  "name": "@xiangqi-web/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:push": "prisma db push --schema prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@prisma/client": "^6.16.2",
+    "@xiangqi-web/shared": "*",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.0",
+    "elephantops": "^0.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "prisma": "^6.16.2"
+  }
+}

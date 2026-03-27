@@ -30,6 +30,10 @@ coverage/
 tmp/
 .cache/
 
+# Local database artifacts
+apps/server/prisma/dev.db
+apps/server/prisma/*.db-journal
+
 # Logs
 *.log
 logs/

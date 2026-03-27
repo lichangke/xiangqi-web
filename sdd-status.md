@@ -5,14 +5,14 @@
 - 当前状态：有效
 - 所属阶段：状态总览
 - 所属项目：象棋网页版项目（暂定）
-- 所属功能 / 子功能：项目启动 / 需求讨论
+- 所属功能 / 子功能：Implement / Task Bundle A（基础框架与规则基线）
 - 上游文档：docs/需求分析结论.md
 - 创建时间：2026-03-26
-- 最后更新时间：2026-03-26
+- 最后更新时间：2026-03-27
 
 ## 1. 当前阶段
-- 当前阶段：Execution Contract → Implement 切换点
-- 当前阶段状态：execution-contract.md 已确认，当前已具备进入 Implement 的条件，待启动 Task Bundle A 实现
+- 当前阶段：Implement（Task Bundle A 已回收确认并完成提交，待安排 Task Bundle B）
+- 当前阶段状态：Task Bundle A 已完成代码落地、验证、主会话回收与提交；当前下一步应在继续前确认 Task Bundle B 的执行范围
 
 ## 2. 各核心文档状态
 ### spec.md
@@ -38,23 +38,24 @@
 ### review.md
 - 状态：未创建
 - 是否已确认：否
-- 备注：当前尚未进入实现与验收阶段
+- 备注：当前仍在 Implement 阶段，尚未进入 Review
 
 ## 3. 当前中断点
 ### 上次停在什么位置
-已完成 execution-contract.md 确认回写，当前处于“Execution Contract → Implement”切换点。
+Task Bundle A 已由 subagent 完成首轮 Implement 落地；主会话已完成结果回收，并确认 `elephantops` baseline 可接受。
 
 ### 为什么停下
-执行协议已经具备放行条件，但尚未正式启动 Task Bundle A 的 Implement 执行。
+本轮回收到提交为止已完成；当前暂停点在于尚未继续拆解与启动 Task Bundle B。
 
 ### 恢复时应先处理什么
-根据 execution-contract.md 启动 Task Bundle A 的实现执行，并在结果返回后完成第一次回收。
+先阅读 `docs/Task Bundle A 实现记录.md` 与本状态卡，确认 Bundle A 的提交边界；随后进入 Task Bundle B 的范围确认与执行安排。
 
 ## 4. 下一步唯一推荐动作
-启动 Task Bundle A 的 Implement 执行（subagent，会话隔离）。
+进入 Task Bundle B 前的范围确认与执行安排。
 
 ## 5. 当前阻塞 / 未决问题
 - 当前无新的关键阻塞
+- 规则 baseline 已接受为 `elephantops` 适配落地；后续若需更贴近目标规则附录，可在保持业务层隔离的前提下替换实现
 
 ## 6. 最近执行痕迹摘要
 - [2026-03-26] 完成项目目录初始化
@@ -77,10 +78,16 @@
 - [2026-03-27] 创建 execution-contract.md 第一版草案，项目正式进入 Execution Contract 收口阶段
 - [2026-03-27] 完成 execution-contract 收口：明确默认回退目标为“仅补充 Execution Contract”，允许进入 Implement
 - [2026-03-27] 因 Codex ACP 链路稳定性不足，将 Task Bundle A 的默认执行者从 Codex 调整为 subagent，执行方式改为 OpenClaw subagent 会话
+- [2026-03-27] 完成 Task Bundle A 首轮 Implement：建立 apps/web + apps/admin + apps/server + packages/shared 单仓骨架
+- [2026-03-27] 完成 Prisma schema 初稿与初始化迁移，落盘 User / UserPreference / GameSession / ModelConfig / RuntimePolicy / AuditLog
+- [2026-03-27] 完成用户名密码认证基础、管理员用户管理基础接口与默认种子账号
+- [2026-03-27] 完成规则适配层 baseline 封装与典型规则测试；优先评估 `xiangqi.js` 未能直接落地，当前通过适配层接入 `elephantops`
+- [2026-03-27] 完成新建对局 / 读取当前对局基础 API，并通过自动化测试与运行态验证
+- [2026-03-27] 主会话完成 Task Bundle A 结果回收，接受 `elephantops` 方案，并完成本轮提交边界收口
 
 ## 7. 当前执行范围（Implement 阶段重点填写）
 ### 当前正在执行
-- Implement 启动前准备
+- 当前无进行中的实现任务；Task Bundle A 已回收提交完毕，待进入下一 bundle
 
 ### 当前已完成
 - 项目启动与需求讨论的第一轮收口
@@ -89,14 +96,19 @@
 - plan.md 第一版草案起草与确认
 - tasks.md 第一版草案起草与确认
 - execution-contract.md 第一版草案起草与确认
+- Task Bundle A 代码实现：单仓骨架、数据库 schema 初稿、认证底座、规则适配层、规则测试、新建/读取对局基础接口
+- Task Bundle A 验证：自动化测试通过、全量构建通过、服务端运行态接口验证通过
+- Task Bundle A 主会话回收：已接受 `elephantops` baseline，并确认本轮可收口提交
 
 ### 当前未完成
-- Task Bundle A 实现执行
-- 实现结果第一次回收
+- Task Bundle B 实现执行
 - 后续实现回收与 Review
 
 ### 当前验证情况
-- 当前为执行协议已确认、实现尚未启动阶段，尚未进入代码实现验证
+- `npm test` 通过（11/11）
+- `npm run build` 通过（shared / server / web / admin）
+- `npm run dev:server` 启动成功
+- `GET /api/health`、`POST /api/auth/login`、`POST /api/games`、`GET /api/games/current` 已完成实测
 
 ## 8. 当前实现执行状态
 - 当前执行代理：subagent
@@ -105,13 +117,13 @@
 - 当前 repo / cwd：xiangqi-web
 - 当前轮次：项目启动
 - 当前 task bundle：Task Bundle A（基础框架与规则基线）
-- 当前执行状态：prepared
-- 最近一次执行结果：未开始
-- 当前会话是否仍可复用：是
+- 当前执行状态：implemented-recovered-and-committed
+- 最近一次执行结果：已完成首轮实现、验证、主会话回收与提交
+- 当前会话是否仍可复用：否（建议直接基于当前代码与文档继续）
 
 ## 9. 恢复提示
 默认恢复顺序：
 1. 先看本状态卡
-2. 再读 docs/需求分析结论.md
-3. 若需恢复上下文，先读已确认的 spec.md、plan.md、tasks.md 与 execution-contract.md
-4. 启动 Task Bundle A 的 Implement 执行，并在返回后先完成结果回收
+2. 再读 `docs/Task Bundle A 实现记录.md`
+3. 若需恢复上下文，再读 docs/需求分析结论.md 与已确认的 spec.md、plan.md、tasks.md、execution-contract.md
+4. 直接进入 Task Bundle B 的范围确认与执行安排

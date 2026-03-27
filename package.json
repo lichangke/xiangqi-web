@@ -1,0 +1,30 @@
+{
+  "name": "xiangqi-web",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run build --workspace @xiangqi-web/shared && npm run prisma:generate --workspace @xiangqi-web/server",
+    "dev": "concurrently -k -n server,web,admin \"npm run dev:server\" \"npm run dev:web\" \"npm run dev:admin\"",
+    "dev:server": "npm run dev --workspace @xiangqi-web/server",
+    "dev:web": "npm run dev --workspace @xiangqi-web/web",
+    "dev:admin": "npm run dev --workspace @xiangqi-web/admin",
+    "build": "npm run build --workspace @xiangqi-web/shared && npm run build --workspace @xiangqi-web/server && npm run build --workspace @xiangqi-web/web && npm run build --workspace @xiangqi-web/admin",
+    "test": "DATABASE_URL=\"file:./dev.db\" JWT_SECRET=\"dev-only-secret-change-me\" vitest run",
+    "db:generate": "npm run prisma:generate --workspace @xiangqi-web/server",
+    "db:push": "DATABASE_URL=\"file:./dev.db\" npm run prisma:push --workspace @xiangqi-web/server",
+    "db:migrate": "DATABASE_URL=\"file:./dev.db\" npx prisma migrate deploy --schema apps/server/prisma/schema.prisma",
+    "db:seed": "DATABASE_URL=\"file:./dev.db\" npm run db:seed --workspace @xiangqi-web/server"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.6.0",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
