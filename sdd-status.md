@@ -5,14 +5,14 @@
 - 当前状态：有效
 - 所属阶段：状态总览
 - 所属项目：象棋网页版项目（暂定）
-- 所属功能 / 子功能：Implement / Task Bundle C（演绎展示与移动端体验）
+- 所属功能 / 子功能：Implement / Task Bundle C（AI 决策与演绎体验二轮修正）
 - 上游文档：docs/需求分析结论.md
 - 创建时间：2026-03-26
-- 最后更新时间：2026-03-27
+- 最后更新时间：2026-04-03
 
 ## 1. 当前阶段
-- 当前阶段：Implement（Task Bundle C 技术验收通过，但人工走查未通过）
-- 当前阶段状态：Task Bundle A 已完成回收并推送；Task Bundle B 已按确认边界完成实现、验证、主会话回收与提交；Task Bundle C 已完成真实代码实现、主会话结果回收与技术验证，但在真实手机走查中暴露出体验层缺口，当前不建议收口，也不建议进入 Bundle D
+- 当前阶段：Implement（Task Bundle C 已形成稳定快照，可进入 Review / Acceptance 判断）
+- 当前阶段状态：Task Bundle A 已完成回收并推送；Task Bundle B 已按确认边界完成实现、验证、主会话回收与提交；Task Bundle C 首轮已完成真实代码实现与技术验收，但真实手机走查未通过。围绕“演绎质量偏模板化”的极窄精修现已完成，且短人工复核已明确给出“通过，可以收口”结论。当前相关代码、测试、验收与状态文档已整理为稳定快照，因此当前口径已从“Bundle C 可阶段性收口、仓库快照待收稳”切换为“Bundle C 已形成稳定快照，可进入 Review / Acceptance 判断”。
 
 ## 2. 各核心文档状态
 ### spec.md
@@ -28,61 +28,86 @@
 ### tasks.md
 - 状态：已创建（已确认）
 - 是否已确认：是
-- 备注：已补清 Task Bundle C / D 在主题切换与偏好持久化上的边界；当前建议继续留在 Bundle C 修正，而非进入 D
+- 备注：已补清 Task Bundle C / D 在主题切换与偏好持久化上的边界；当前 Task Bundle C 已形成稳定快照
 
 ### execution-contract.md
 - 状态：已创建（已确认）
 - 是否已确认：是
-- 备注：已完成 Task Bundle C 的执行协议收口；当前问题不在协议是否存在，而在实现质量尚未通过人工走查
+- 备注：Task Bundle C 二轮修正执行协议已完成本轮使命；当前已完成稳定快照整理
+
+### docs/Task Bundle C 实现交接.md
+- 状态：已创建（已确认）
+- 是否已确认：是
+- 备注：本轮交接使命已完成；当前不再新开实现范围
 
 ### review.md
 - 状态：未创建
 - 是否已确认：否
-- 备注：当前仍在 Implement 阶段，尚未进入 Review
+- 备注：Bundle C 已形成稳定快照；是否正式进入 Review / Acceptance，可作为下一步判断
 
 ## 3. 当前中断点
 ### 上次停在什么位置
-Task Bundle C 已完成严格版隔离实现、主会话结果回收、代码复核、专项测试、回归测试、全量测试、构建验证与最小运行态验证；随后又完成一轮用户手机真实测试。
+Task Bundle C 围绕“演绎模板化”完成了最后一轮极窄精修：事件叙述模板化、turn 的 consensus / decision / review 句法重复，以及 highlight 收尾重复感均已继续下压；相关代码、测试与构建结果已由主会话回收。随后按超短清单完成短人工复核，用户明确给出“通过，可以收口”结论；之后主会话又完成了工作树整理、测试收平与稳定快照回写。
 
 ### 为什么停下
-虽然技术验证通过，但用户手机测试已经明确指出：
-- 非法步有提示，但演绎区没有对应处理
-- 悔棋可行且有限制，但演绎区没有对应处理
-- 主题可切换
-- 演绎整体偏呆板
-
-因此当前问题不再是“是否有实现”，而是“体验层是否达到 Bundle C 收口标准”；目前答案是否。
+当前不再卡在代码实现、统一时间线链路、移动端破坏、自动验证失败、人工复核结论未定，或“仓库快照尚未收稳”这些问题，而是刻意停在“Bundle C 已形成稳定快照，等待是否进入 Review / Acceptance”的检查点。
 
 ### 恢复时应先处理什么
-先按 docs/Task Bundle C 人工走查结果.md 回到 Bundle C 做修正，不要进入 Bundle D。
+不要继续磨 Bundle C 文案，也不要默认立即进入 Bundle D。恢复时应先基于当前稳定快照，判断是否进入 Review / Acceptance；若不进入，再决定是否开启后续增量工作。
 
 ## 4. 下一步唯一推荐动作
-继续留在 Task Bundle C，但执行口径已升级为 AI 决策与演绎体验升级，下一步应补做三项：
-1. 重构独立标准 AI 决策层，并输出结构化解释字段
-2. 让普通回合与非法落子、悔棋等特殊事件统一进入同一演绎时间线
-3. 用剧情圣经、语义标签、剧情线程摘要与统一 schema 重做演绎策略，降低呆板感
+直接执行 **Bundle C 收口后的阶段判断**：
+1. 基于当前稳定快照，确认是否进入 Review / Acceptance
+2. 若进入，则补齐对应 review / acceptance 材料
+3. 若暂不进入，则明确后续是 Bundle D 还是增量 SDD
 
 ## 5. 当前阻塞 / 未决问题
 - 当前无新的关键技术阻塞
-- 当前关键问题已从“模板是否补齐”升级为“独立 AI 决策层与结构化演绎机制是否能形成新的产品体验闭环”
-- 当前已确认 Task Bundle C 不再只按旧的“模板补强”理解，而是按“独立 AI 决策层 + 结构化演绎系统 V1”继续推进
-- 当前未过线项：
-  - 尚未完成独立标准 AI 决策层升级
-  - 非法步与悔棋未真正并入统一演绎时间线
-  - 演绎质量偏呆板
+- 当前无新的演绎质量未决问题；短人工复核已给出“通过，可以收口”结论
+- 当前口径修正：文档中的“决策 AI / 演绎 AI”在当前版本应按职责分层理解；当前代码仍未接入外部大模型
+- 当前已过线项：
+  - 独立标准决策层（规则 + 启发式评分）已接入并通过构建验证
+  - `illegal_move`、`undo` 已进入统一时间线消费链路，并通过人工走查确认
+  - 合法落子后的统一时间线观感已通过人工走查
+  - 移动端主链路未被二轮修正破坏
+  - 数据库链路、集成测试与全量测试已完成回收
+  - 围绕模板化的极窄精修已完成；事件叙述、turn 的 consensus / decision / review 与 highlight 句法重复感已继续下压
+  - 短人工复核已通过，Bundle C 已形成稳定快照
+- 当前未决项：
+  - Bundle C 稳定快照之后，下一步是先进入 Review / Acceptance，还是转入后续增量工作
 
 ## 6. 最近执行痕迹摘要
+- [2026-04-03] 主会话按稳定快照口径回写 `docs/Task Bundle C 验收结论.md` 与本状态卡
+- [2026-04-03] 主会话收紧 `tests/web/presentation.spec.ts` 断言口径，改为语义稳定断言
+- [2026-04-03] 主会话执行 `npm test`，结果 21/21 通过
+- [2026-04-03] 主会话执行 `npm run build`，结果通过
+- [2026-03-31] 用户完成短人工复核，并明确给出结论：“通过，可以收口”
+- [2026-03-31] 已更新 `docs/Task Bundle C 人工走查结果.md`，正式记录本轮短人工复核通过
+- [2026-03-31] 已更新 `docs/Task Bundle C 验收结论.md` 与本状态卡，确认 Bundle C 当前可阶段性收口，但仓库快照尚未收稳
+- [2026-03-31] 主会话完成 Task Bundle C 围绕演绎模板化的最后一轮极窄精修：继续下压事件叙述模板化、turn 的 consensus / decision / review 首句骨架与 highlight 收尾句重复感，并引入基于回合语义而非单纯 turnNumber 的选句逻辑
+- [2026-03-31] 主会话执行 `npm test`，结果 21/21 通过
+- [2026-03-31] 主会话执行 `npm run build`，结果通过
+- [2026-03-31] 主会话完成新的连续回合文本抽样复核：当前判断已从“继续极窄精修”切换为“精修已完成，准备进入短人工复核”
+- [2026-03-29] 用户完成最新一轮最小人工走查：合法落子时间线通过；`illegal_move` 进入统一时间线通过；`undo` 进入统一时间线通过；移动端主链路通过；演绎质量仍偏呆板、偏模板化，但较上一轮有所改善
+- [2026-03-29] 已更新 `docs/Task Bundle C 人工走查结果.md`、`docs/Task Bundle C 验收结论.md` 与本状态卡，确认当前继续留在 Bundle C 做极窄精修
+- [2026-03-28] 主会话修复 `apps/server/src/domain/ai/decision/standard-ai-decision.ts` 中的 decision 层 TS 报错，并确认 `npm run build --workspace @xiangqi-web/server` 与 `npm run build` 通过
+- [2026-03-28] 主会话执行 `npm run db:generate` 与 `npm run db:push`，数据库链路验证通过
+- [2026-03-28] 主会话执行 `npx vitest run tests/integration/auth-and-game-api.spec.ts`，结果 10/10 通过
+- [2026-03-28] 主会话执行 `npm test`，结果 21/21 通过
+- [2026-03-28] 已确认 Task Bundle C 二轮修正达到“自动验证已回收、允许进入最小人工走查”的状态
+- [2026-03-28] 已按 `sdd-status.md` 恢复当前轮次，并新增 `docs/Task Bundle C 实现交接.md`
+- [2026-03-28] 已将 `execution-contract.md` 切换为 Task Bundle C 二轮修正执行协议
 - [2026-03-27] 用户完成手机真实测试，结果确认：合法落子 ok；非法步有界面提示但演绎区未处理；悔棋可行且有 5 次限制但演绎区未处理；主题可切换；演绎整体偏呆板
-- [2026-03-27] 已新增 docs/Task Bundle C 人工走查结果.md，正式记录本轮真实走查结论
-- [2026-03-27] 已将 docs/Task Bundle C 验收结论.md 从“有条件通过 / 可阶段性收口”收紧为“技术验收通过，但人工走查未通过，暂不收口”
+- [2026-03-27] 已新增 `docs/Task Bundle C 人工走查结果.md`，正式记录本轮真实走查结论
+- [2026-03-27] 已将 `docs/Task Bundle C 验收结论.md` 从“有条件通过 / 可阶段性收口”收紧为“技术验收通过，但人工走查未通过，暂不收口”
 - [2026-03-27] 主会话完成 Task Bundle C 严格技术验收：直接执行 `tests/web/presentation.spec.ts`，结果 5/5 通过
 - [2026-03-27] 主会话完成 Task Bundle C + 主链路回归：执行 `tests/integration/auth-and-game-api.spec.ts` + `tests/web/presentation.spec.ts`，结果 15/15 通过
 - [2026-03-27] 主会话执行 `npm test`，结果 21/21 通过
 - [2026-03-27] 主会话执行 `npm run build`，结果通过
 - [2026-03-27] 主会话验证 `GET /api/health` 返回 200，并重新拉起前端页面验证 `http://127.0.0.1:4176/` 返回 200，页面标题可读出“象棋网页版 - 用户端”
-- [2026-03-27] 主会话完成 Task Bundle C 关键代码复核：确认真实代码改动已落入 apps/web、apps/server、packages/shared 与 tests/web
-- [2026-03-27] 已新增 docs/Task Bundle C 人工走查清单.md，作为真实交互验收入口
-- [2026-03-27] 完成 Task Bundle C 范围确认：收口为“演绎展示 + 特殊事件模板 + 手机端可用性 + 三主题前端切换（不含持久化）”
+- [2026-03-27] 主会话完成 Task Bundle C 关键代码复核：确认真实代码改动已落入 `apps/web`、`apps/server`、`packages/shared` 与 `tests/web`
+- [2026-03-27] 已新增 `docs/Task Bundle C 人工走查清单.md`，作为真实交互验收入口
+- [2026-03-27] 完成 Task Bundle C 范围确认：收口为“演绎展示 + 特殊事件模板 + 手机端可用性 + 三主题前端切换（不含持久化）"
 - [2026-03-27] 已将 execution-contract 切换到 Task Bundle C，并同步补清 tasks 中 C / D 的主题边界
 - [2026-03-27] 完成 Task Bundle B 实现：补全落子 / 悔棋 / 认输 API、GameSession 对局推进与 AI 合法应对闭环
 - [2026-03-27] 完成 Task Bundle B 最小前端棋盘页：支持新建对局、点击选子、点击目标点落子与局面刷新
@@ -90,56 +115,64 @@ Task Bundle C 已完成严格版隔离实现、主会话结果回收、代码复
 - [2026-03-27] 主会话完成 Task Bundle B 结果回收与复核，并确认本轮可收口提交
 - [2026-03-27] 将 Task Bundle A 回收提交推送到远端仓库
 - [2026-03-26] 完成项目目录初始化
-- [2026-03-26] 写入 docs/需求分析结论.md
-- [2026-03-26] 写入 sdd-status.md
+- [2026-03-26] 写入 `docs/需求分析结论.md`
+- [2026-03-26] 写入 `sdd-status.md`
 
 ## 7. 当前执行范围（Implement 阶段重点填写）
 ### 当前正在执行
-- 当前无新的进行中实现任务；Task Bundle C 已完成技术验收，但待做一轮 Bundle C 修正
+- 当前无新的代码实现进行中；Task Bundle C 已形成稳定快照，当前停在收口后的阶段判断点
 
 ### 当前已完成
 - 项目启动与需求讨论的第一轮收口
 - 项目目录与初始文档落盘
-- spec.md 第一版草案起草与确认
-- plan.md 第一版草案起草与确认
-- tasks.md 第一版草案起草与确认
-- execution-contract.md 第一版草案起草与确认
+- `spec.md` 第一版草案起草与确认
+- `plan.md` 第一版草案起草与确认
+- `tasks.md` 第一版草案起草与确认
+- `execution-contract.md` 第一版草案起草与确认
 - Task Bundle A 代码实现、验证、回收与远端同步
 - Task Bundle B 范围确认、代码实现、测试补齐与主会话回收
 - Task Bundle C 范围确认与文档边界收口
-- Task Bundle C 真实代码实现：已确认代码改动落入 apps/web/src/App.tsx、apps/web/src/styles.css、apps/web/src/presentation.ts、apps/server/src/domain/game/game-service.ts、apps/server/src/domain/game/types.ts、packages/shared/src/index.ts、tests/web/presentation.spec.ts
-- Task Bundle C 技术验收：专项测试、回归测试、全量测试、构建验证与最小运行态验证均已通过
-- Task Bundle C 人工走查：已完成一轮真实手机测试，并确认当前不应收口
+- Task Bundle C 首轮真实代码实现与技术验收
+- Task Bundle C 首轮人工走查：已完成一轮真实手机测试，并确认当时不应收口
+- Task Bundle C 二轮修正 handoff：已完成 `execution-contract.md` 与 `docs/Task Bundle C 实现交接.md` 的正式落盘
+- Task Bundle C 二轮修正代码回收：已确认关键改动落入 Bundle C 相关 server / web / shared / tests 链路文件
+- Task Bundle C 二轮修正自动验证回收：构建、数据库链路、集成测试与全量测试均已通过
+- Task Bundle C 最新最小人工走查：已确认统一时间线主链路成立，问题收敛为演绎质量仍偏模板化
+- Task Bundle C 围绕模板化的最后一轮极窄精修：已完成事件叙述、turn 的 consensus / decision / review 与 highlight 句法去重，并完成基于语义特征的选句逻辑调整
+- Task Bundle C 极窄精修后的自动验证与抽样文本复核：已完成回收
+- Task Bundle C 短人工复核：已完成，结论为“通过，可以收口”
+- Task Bundle C 稳定快照整理：已完成
 
 ### 当前未完成
-- Task Bundle C 体验缺口修正
-- Task Bundle C 二轮人工走查
-- Task Bundle C 最终收口回写
-- 后续 Bundle D / Review
+- Bundle C 稳定快照后的下一阶段动作确定
 
 ### 当前验证情况
-- `npx vitest run tests/web/presentation.spec.ts` 通过（5/5）
-- `npx vitest run tests/integration/auth-and-game-api.spec.ts tests/web/presentation.spec.ts` 通过（15/15）
-- `npm test` 通过（21/21）
+- `npm run build --workspace @xiangqi-web/server` 通过
 - `npm run build` 通过（shared / server / web / admin）
-- `GET /api/health` 返回 200
-- `http://127.0.0.1:4176/` 返回 200，页面标题可读出“象棋网页版 - 用户端”
-- 用户手机真实测试结论：主题切换通过；合法落子通过；非法步 / 悔棋事件与演绎区未打通；演绎质量偏呆板
+- `npm run db:generate` 通过
+- `npm run db:push` 通过
+- `npx vitest run tests/integration/auth-and-game-api.spec.ts` 通过（10/10）
+- `npm test` 通过（21/21）
+- 极窄精修后追加验证：`npm test` 再次通过（21/21），`npm run build` 再次通过
+- 稳定快照整理时追加验证：`npm test` 再次通过（21/21），`npm run build` 再次通过
+- 短人工复核结论：通过，可以收口
+- 当前状态结论：Bundle C 已形成稳定快照；当前只剩下一阶段动作判断
 
 ## 8. 当前实现执行状态
-- 当前执行代理：subagent + 主会话回收 + 用户真实测试
-- 当前执行模式：Coding Agent 实现
+- 当前执行代理：主会话已完成结果回收；当前无新的执行代理运行中
+- 当前执行模式：主会话回收 / 稳定快照已完成
 - 当前会话策略：单任务隔离
 - 当前 repo / cwd：xiangqi-web
-- 当前轮次：项目启动
-- 当前 task bundle：Task Bundle C（演绎展示与移动端体验）
-- 当前执行状态：implemented-technically-validated-but-manual-walkthrough-failed
-- 最近一次执行结果：Task Bundle C 已完成真实代码实现与技术验收，但人工走查未通过
-- 当前会话是否仍可复用：否（建议直接基于当前工作树继续做 C 修正）
+- 当前轮次：项目启动 / Task Bundle C 二轮修正
+- 当前 task bundle：Task Bundle C（AI 决策与演绎体验二轮修正）
+- 当前执行状态：bundle-c-stable-snapshot-ready-for-review-decision
+- 最近一次执行结果：Task Bundle C 已形成稳定快照，可进入 Review / Acceptance 判断
+- 当前会话是否仍可复用：是（仅用于处理阶段判断与后续承接；不应用于继续扩散实现范围）
 
 ## 9. 恢复提示
 默认恢复顺序：
 1. 先看本状态卡
-2. 再读 docs/Task Bundle C 人工走查结果.md
-3. 再读 docs/Task Bundle C 验收结论.md
-4. 继续留在 Bundle C 修正，不进入 Bundle D
+2. 再读 `docs/Task Bundle C 人工走查结果.md`
+3. 再读 `docs/Task Bundle C 验收结论.md`
+4. 先判断是否进入 Review / Acceptance
+5. 再决定是否进入后续增量工作

@@ -392,6 +392,37 @@ input {
   color: var(--text-secondary);
 }
 
+.story-thread-card {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--surface-border);
+  background: color-mix(in srgb, var(--surface-soft) 92%, transparent);
+}
+
+.story-thread-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.story-thread-grid div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-strong);
+}
+
+.story-thread-grid strong {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .empty-board-state {
   min-height: 480px;
   display: flex;
@@ -457,33 +488,36 @@ input {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent) inset;
 }
 
-.event-list,
-.narrative-list {
+.timeline-list {
   display: grid;
   gap: 14px;
 }
 
-.event-card,
-.narrative-turn {
+.timeline-item {
   border-radius: 18px;
   border: 1px solid var(--surface-border);
   background: var(--surface-strong);
   padding: 16px;
 }
 
-.event-head,
-.narrative-turn header {
+.timeline-item header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
 }
 
-.event-card p,
 .narrative-summary,
 .narrative-segment {
   margin: 10px 0 0;
   color: var(--text-secondary);
+}
+
+.timeline-meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .tone-info {
@@ -506,11 +540,15 @@ input {
   overflow: hidden;
 }
 
-.narrative-turn-latest {
+.timeline-item-latest {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent) inset;
 }
 
-.narrative-turn header strong {
+.timeline-item-event {
+  background: color-mix(in srgb, var(--surface-strong) 88%, var(--surface-soft));
+}
+
+.timeline-item header strong {
   display: block;
   font-size: 18px;
 }
@@ -622,6 +660,10 @@ input {
   .status-list li {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .story-thread-grid {
+    grid-template-columns: 1fr;
   }
 }
 

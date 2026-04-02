@@ -3,6 +3,11 @@ import { Xiangqi } from 'elephantops/xiangqi';
 import { makeSquare, makeUci, parseSquare, parseUci } from 'elephantops/util';
 import type { MoveInput, RuleAdapter, RuleMove, ValidationResult } from './types.js';
 
+type BoardPiece = {
+  role: 'king' | 'advisor' | 'elephant' | 'horse' | 'chariot' | 'cannon' | 'pawn';
+  color: 'red' | 'black';
+};
+
 function createPosition(fen: string) {
   const parsed = parseFen(fen);
   if (parsed.isErr) {
@@ -17,12 +22,36 @@ function createPosition(fen: string) {
   return position.value;
 }
 
-function toRuleMove(from: number, to: number): RuleMove {
+function toPieceCode(piece: BoardPiece | undefined) {
+  if (!piece) {
+    return undefined;
+  }
+
+  const code = {
+    king: 'k',
+    advisor: 'a',
+    elephant: 'b',
+    horse: 'n',
+    chariot: 'r',
+    cannon: 'c',
+    pawn: 'p',
+  }[piece.role];
+
+  return piece.color === 'red' ? code.toUpperCase() : code;
+}
+
+function toRuleMove(fen: string, from: number, to: number): RuleMove {
+  const position = createPosition(fen);
+  const piece = position.board.get(from) as BoardPiece | undefined;
+  const captured = position.board.get(to) as BoardPiece | undefined;
   const move = { from, to };
+
   return {
     from: makeSquare(from),
     to: makeSquare(to),
     san: makeUci(move),
+    piece: toPieceCode(piece),
+    captured: toPieceCode(captured),
   };
 }
 
@@ -42,7 +71,7 @@ export class XiangqiRuleAdapter implements RuleAdapter {
   getLegalMoves(fen: string) {
     const position = createPosition(fen);
     return [...position.allDests().entries()].flatMap(([from, destinations]) =>
-      [...destinations].map((to) => toRuleMove(from, to)),
+      [...destinations].map((to) => toRuleMove(fen, from, to)),
     );
   }
 
@@ -62,11 +91,7 @@ export class XiangqiRuleAdapter implements RuleAdapter {
 
     return {
       ok: true,
-      move: {
-        from: input.from,
-        to: input.to,
-        san: makeUci(move),
-      },
+      move: toRuleMove(fen, from, to),
     };
   }
 

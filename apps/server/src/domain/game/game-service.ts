@@ -1,6 +1,6 @@
 import { Difficulty, GameStatus, type GameSession, type PrismaClient } from '@prisma/client';
 import type { GameActor } from '@xiangqi-web/shared';
-import { SimpleAiStrategy } from '../ai/strategy/simple-ai-strategy.js';
+import { StandardAiDecisionEngine } from '../ai/decision/standard-ai-decision.js';
 import type { MoveInput, RuleAdapter } from '../rules/types.js';
 import { HttpError } from '../../utils/http-error.js';
 import {
@@ -9,6 +9,23 @@ import {
   toGameSummary,
   type PersistedMoveRecord,
 } from './types.js';
+
+const PIECE_LABELS: Record<string, string> = {
+  K: '帅',
+  A: '仕',
+  B: '相',
+  N: '马',
+  R: '车',
+  C: '炮',
+  P: '兵',
+  k: '将',
+  a: '士',
+  b: '象',
+  n: '马',
+  r: '车',
+  c: '炮',
+  p: '卒',
+};
 
 function assertDifficulty(value: string): Difficulty {
   if (Object.values(Difficulty).includes(value as Difficulty)) {
@@ -30,14 +47,22 @@ function deriveStatus(summary: { isCheckmate: boolean; isStalemate: boolean; isG
   return GameStatus.ONGOING;
 }
 
+function pieceTypeLabel(code?: string) {
+  return code ? (PIECE_LABELS[code] ?? '子') : undefined;
+}
+
+function logAiFailure(payload: { failureReason: string; turnType: 'turn' | 'event'; eventType: string }) {
+  console.warn('[bundle-c-ai-fallback]', payload);
+}
+
 export class GameService {
-  private readonly aiStrategy: SimpleAiStrategy;
+  private readonly decisionEngine: StandardAiDecisionEngine;
 
   constructor(
     private readonly prisma: PrismaClient,
     private readonly rules: RuleAdapter,
   ) {
-    this.aiStrategy = new SimpleAiStrategy(rules);
+    this.decisionEngine = new StandardAiDecisionEngine(rules);
   }
 
   async createGame(userId: string, difficultyValue: string) {
@@ -122,13 +147,32 @@ export class GameService {
       };
     }
 
-    const aiDecision = this.aiStrategy.chooseMove(userMoveResult.nextFen, game.difficulty);
-    const aiMoveResult = this.rules.applyMove(userMoveResult.nextFen, aiDecision.move);
+    const decisionInput = {
+      fenAfterUserMove: userMoveResult.nextFen,
+      difficulty: game.difficulty,
+      history,
+      userMove: userMoveRecord,
+      userFenBefore: game.currentFen,
+    };
+
+    let decision;
+    try {
+      decision = this.decisionEngine.decide(decisionInput);
+    } catch (error) {
+      logAiFailure({
+        failureReason: error instanceof Error ? error.message : 'decision_engine_failed',
+        turnType: 'turn',
+        eventType: 'none',
+      });
+      decision = this.decisionEngine.buildFallbackDecision(decisionInput);
+    }
+
+    const aiMoveResult = this.rules.applyMove(userMoveResult.nextFen, decision.chosenMove);
     if (!aiMoveResult.ok) {
       throw new HttpError(500, 'AI_ILLEGAL_MOVE', 'AI 候选步异常，未能生成合法应对');
     }
 
-    const aiMoveRecord = this.createMoveRecord('AI', turnNumber, userMoveResult.nextFen, aiMoveResult.nextFen, aiMoveResult.move);
+    const aiMoveRecord = this.createMoveRecord('AI', turnNumber, userMoveResult.nextFen, aiMoveResult.nextFen, aiMoveResult.move, decision);
     const finalStatus = deriveStatus(aiMoveResult.summary);
     const updatedGame = await this.prisma.gameSession.update({
       where: { id: game.id },
@@ -242,7 +286,8 @@ export class GameService {
     turnNumber: number,
     fenBefore: string,
     fenAfter: string,
-    move: { from: string; to: string; san?: string },
+    move: { from: string; to: string; san?: string; piece?: string; captured?: string },
+    decision?: PersistedMoveRecord['decision'],
   ): PersistedMoveRecord {
     return {
       actor,
@@ -252,6 +297,11 @@ export class GameService {
       from: move.from,
       to: move.to,
       san: move.san,
+      piece: move.piece,
+      captured: move.captured,
+      pieceType: pieceTypeLabel(move.piece),
+      capturedPieceType: pieceTypeLabel(move.captured),
+      decision,
     };
   }
 
@@ -262,6 +312,11 @@ export class GameService {
       from: move.from,
       to: move.to,
       san: move.san,
+      piece: move.piece,
+      captured: move.captured,
+      pieceType: move.pieceType,
+      capturedPieceType: move.capturedPieceType,
+      decision: move.decision,
     };
   }
 }

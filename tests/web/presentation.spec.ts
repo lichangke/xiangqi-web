@@ -1,12 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import type { GameSummary } from '@xiangqi-web/shared';
+import { describe, expect, it, vi } from 'vitest';
+import type { GameSummary, NarrativeRequestEnvelope, NarrativeResponseEnvelope } from '@xiangqi-web/shared';
 import {
   THEME_OPTIONS,
   buildCheckEvent,
   buildErrorEvent,
   buildFinishEvent,
-  buildNarrativeTurns,
+  buildTimelineItems,
   buildUndoEvent,
+  resolveTimelineItem,
 } from '../../apps/web/src/presentation.js';
 
 function createGame(overrides: Partial<GameSummary> = {}): GameSummary {
@@ -18,17 +19,86 @@ function createGame(overrides: Partial<GameSummary> = {}): GameSummary {
     undoCount: 0,
     canUndo: true,
     moves: [
-      { actor: 'USER', turnNumber: 1, from: 'b3', to: 'b4' },
-      { actor: 'AI', turnNumber: 1, from: 'h8', to: 'h7' },
-      { actor: 'USER', turnNumber: 2, from: 'c3', to: 'c4' },
-      { actor: 'AI', turnNumber: 2, from: 'g7', to: 'g6' },
+      {
+        actor: 'USER',
+        turnNumber: 1,
+        from: 'b3',
+        to: 'b4',
+        piece: 'P',
+        pieceType: '兵',
+      },
+      {
+        actor: 'AI',
+        turnNumber: 1,
+        from: 'h8',
+        to: 'h7',
+        piece: 'p',
+        pieceType: '卒',
+        decision: {
+          chosenMove: { from: 'h8', to: 'h7', piece: 'p' },
+          userMoveTag: '试探',
+          aiMoveTag: '压迫',
+          situationShift: '黑方随即把节奏往边线压力上推了一格。',
+          turnArc: '压力升级',
+          storyThreadSummary: {
+            currentPhase: '对压期',
+            mainConflict: '黑方正在把局势往边线挤压，红方还没真正缓过气。',
+            pressureSide: 'BLACK',
+            recentFocus: '边线压力',
+            carryForward: '下一回合不要急着写翻盘，先看红方如何减压。',
+          },
+          highlightReason: ['吃子压缩空间'],
+          riskLevel: 'medium',
+          pressureSide: 'BLACK',
+        },
+      },
+      {
+        actor: 'USER',
+        turnNumber: 2,
+        from: 'c3',
+        to: 'c4',
+        piece: 'P',
+        pieceType: '兵',
+      },
+      {
+        actor: 'AI',
+        turnNumber: 2,
+        from: 'g7',
+        to: 'g6',
+        piece: 'c',
+        pieceType: '炮',
+        decision: {
+          chosenMove: { from: 'g7', to: 'g6', piece: 'c' },
+          userMoveTag: '抢位',
+          aiMoveTag: '压迫',
+          situationShift: '红方刚抢到一点空间，黑方立刻把压迫线重新校准。',
+          turnArc: '压力升级',
+          storyThreadSummary: {
+            currentPhase: '对压期',
+            mainConflict: '双方都在争谁能先把试探落成实压，黑方当前更占话语权。',
+            pressureSide: 'BLACK',
+            recentFocus: '中路压力',
+            carryForward: '下一回合继续强调红方先解压，再谈反抢。',
+          },
+          highlightReason: ['将军'],
+          riskLevel: 'high',
+          pressureSide: 'BLACK',
+        },
+      },
     ],
     userSide: 'red',
     aiSide: 'black',
     currentTurn: 'USER',
-    isCheck: false,
+    isCheck: true,
     resultWinner: null,
     endedByResign: false,
+    storyThreadSummary: {
+      currentPhase: '对压期',
+      mainConflict: '双方都在争谁能先把试探落成实压，黑方当前更占话语权。',
+      pressureSide: 'BLACK',
+      recentFocus: '中路压力',
+      carryForward: '下一回合继续强调红方先解压，再谈反抢。',
+    },
     startedAt: new Date('2026-03-27T02:00:00.000Z').toISOString(),
     updatedAt: new Date('2026-03-27T02:05:00.000Z').toISOString(),
     endedAt: null,
@@ -41,54 +111,112 @@ describe('web presentation helpers', () => {
     expect(THEME_OPTIONS.map((item) => item.value)).toEqual(['classic', 'ink', 'midnight']);
   });
 
-  it('should build unified narrative turns with four ordered segments', () => {
-    const turns = buildNarrativeTurns(createGame(), 'classic');
+  it('should build unified timeline items for completed turns', () => {
+    const items = buildTimelineItems(createGame(), 'classic');
 
-    expect(turns).toHaveLength(2);
-    expect(turns[0].title).toBe('第 1 回合');
-    expect(turns[1].summary).toContain('AI 应对 g7 → g6');
-    expect(turns[0].segments.map((segment) => segment.kind)).toEqual(['review', 'voices', 'consensus', 'decision']);
-    expect(turns[0].segments[0].label).toBe('简评');
-    expect(turns[0].segments[3].text).toContain('最终落子');
+    expect(items).toHaveLength(2);
+    expect(items[0].kind).toBe('turn');
+    expect(items[0].title).toBe('第 2 回合');
+    expect(items[0].summary).toContain('AI');
+    expect(items[0].meta.tag).toBe('压力升级');
+    expect(items[0].segments.map((segment) => segment.kind)).toEqual(['review', 'voices', 'consensus', 'decision']);
+    expect(items[0].segments[0].text).toContain('红方刚抢到一点空间');
+    expect(items[0].segments[3].text).toMatch(/(中路压力|红方先解压)/);
+    expect(items[0].segments[3].text).toContain('将军');
   });
 
-  it('should append check pressure copy only to the latest ongoing turn', () => {
-    const turns = buildNarrativeTurns(createGame({ isCheck: true }), 'midnight');
+  it('should place illegal move and undo events into the same timeline stream', () => {
+    const game = createGame();
+    const illegal = buildErrorEvent(game, 'midnight', { code: 'ILLEGAL_MOVE', message: '非法', detail: '马腿被卡住。' }, 'b3 → b8', 5);
+    const undo = buildUndoEvent(game, 'midnight', 2, 6);
+    const items = buildTimelineItems(game, 'midnight', [illegal, undo]);
 
-    expect(turns[0].summary).not.toContain('将军');
-    expect(turns[1].summary).toContain('将军');
-    expect(turns[1].segments[0].text).toContain('将军');
+    expect(items[0].kind).toBe('event');
+    expect(items[0].meta.eventType).toBe('undo');
+    expect(items[1].meta.eventType).toBe('illegal_move');
+    expect(items[1].segments[0].text).toContain('马腿被卡住');
+    expect(items[1].segments[0].text).not.toContain('对应的事件事实已经明确');
+    expect(items[1].segments[1].text).not.toContain('当前主线仍是');
+    expect(items[1].segments[2].text).toContain('不计回合');
+    expect(items[0].segments[2].text).toContain('重新接上');
+    expect(items.some((item) => item.kind === 'turn')).toBe(true);
   });
 
-  it('should distinguish illegal move prompts from generic system errors', () => {
-    const illegal = buildErrorEvent({ code: 'ILLEGAL_MOVE', message: '非法', detail: '马腿被卡住。' }, 'b3 → b8');
-    const generic = buildErrorEvent({ code: 'SERVER_ERROR', message: '服务异常' });
+  it('should build check and finish events with consistent envelope semantics', () => {
+    const check = buildCheckEvent(createGame({ isCheck: true }), 'classic', 7);
+    const resign = buildFinishEvent(createGame({ status: 'RESIGNED', endedByResign: true, resultWinner: 'black' }), 'classic', 8);
+    const checkmated = buildFinishEvent(createGame({ status: 'CHECKMATED', resultWinner: 'red', endedAt: new Date().toISOString() }), 'classic', 9);
 
-    expect(illegal.type).toBe('illegal');
-    expect(illegal.meta).toContain('不计回合');
-    expect(illegal.body).toContain('马腿被卡住');
-    expect(generic.type).toBe('system');
-    expect(generic.tone).toBe('danger');
+    const items = buildTimelineItems(createGame(), 'classic', [check, resign, checkmated]);
+
+    expect(items[0].meta.eventType).toBe('finish');
+    expect(items[0].meta.tag).toBe('胜负已定');
+    expect(items[1].meta.eventType).toBe('resign');
+    expect(items[1].meta.tag).toBe('主动收局');
+    expect(items[2].meta.eventType).toBe('check');
+    expect(items[2].segments[0].text).toContain('正面施压');
   });
 
-  it('should build dedicated undo, check, resign and finish cards', () => {
-    const baseGame = createGame();
-    const undo = buildUndoEvent(2);
-    const check = buildCheckEvent(createGame({ isCheck: true }));
-    const resign = buildFinishEvent(createGame({ status: 'RESIGNED', endedByResign: true, resultWinner: 'black' }));
-    const checkmated = buildFinishEvent(createGame({ status: 'CHECKMATED', resultWinner: 'red', endedAt: new Date().toISOString() }));
-    const draw = buildFinishEvent(createGame({ status: 'DRAW', endedAt: new Date().toISOString() }));
+  it('should fallback to minimal timeline payload when generator returns invalid schema', () => {
+    const envelope: NarrativeRequestEnvelope = {
+      schemaVersion: 'v1',
+      requestId: 'turn-1',
+      gameContext: {
+        gameId: 'game-1',
+        turnNumber: 1,
+        userSide: 'red',
+        aiSide: 'black',
+        difficulty: 'NORMAL',
+        gameStatus: 'ONGOING',
+        isCheck: false,
+        isGameEnding: false,
+        storyThreadSummary: createGame().storyThreadSummary,
+      },
+      themeContext: {
+        storyThemeId: 'border-council-night',
+        storyThemeName: '边关夜议',
+        themeTone: '稳中见锋',
+        doNotUseStyles: [],
+      },
+      roleContext: {
+        activeRoles: ['车', '马', '炮'],
+        roleCardsVersion: 'v1',
+        roleHints: [],
+      },
+      itemType: 'turn',
+      itemPayload: {
+        turnNumber: 1,
+        userMove: { from: 'b3', to: 'b4', pieceType: '兵', semanticTag: '试探' },
+        aiMove: { from: 'h8', to: 'h7', pieceType: '卒', semanticTag: '压迫' },
+        capture: false,
+        checkState: { before: false, after: false },
+        situationShift: '局面仍在试探。',
+        turnArc: '试探铺垫',
+        storyThreadSummary: createGame().storyThreadSummary,
+        narrativeGoal: '测试 fallback',
+      },
+      constraints: {
+        maxChars: 180,
+        segmentCount: 4,
+        language: 'zh-CN',
+        mustStayGroundedInFacts: true,
+        allowWorldExpansion: false,
+        mustReturnJson: true,
+      },
+      fallbackPolicy: {
+        fallbackMode: 'template-minimal',
+        timeoutMs: 1000,
+        onSchemaInvalid: 'fallback',
+        onEmptyResponse: 'fallback',
+      },
+    };
 
-    expect(undo.type).toBe('undo');
-    expect(undo.body).toContain('第 2 回合之前');
-    expect(check.type).toBe('check');
-    expect(check.meta).toBe('第 2 回合');
-    expect(resign.type).toBe('resign');
-    expect(resign.title).toBe('认输事件');
-    expect(checkmated.tone).toBe('success');
-    expect(checkmated.meta).toBe('将死');
-    expect(draw.tone).toBe('info');
-    expect(draw.body).toContain('和局');
-    expect(baseGame.status).toBe('ONGOING');
+    const invalidGenerator = vi.fn(() => ({ title: '坏数据' } as unknown as NarrativeResponseEnvelope));
+    const item = resolveTimelineItem('turn-1', 2, envelope, 'classic', { generator: invalidGenerator });
+
+    expect(invalidGenerator).toHaveBeenCalledOnce();
+    expect(item.meta.fallbackUsed).toBe(true);
+    expect(item.segments).toHaveLength(4);
+    expect(item.summary).toContain('你方');
   });
 });

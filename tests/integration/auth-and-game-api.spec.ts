@@ -108,6 +108,8 @@ describe('auth and game APIs', () => {
     expect(current.json().game.id).toBe(createdGame.id);
     expect(current.json().game.currentFen).toBeTruthy();
     expect(current.json().game.currentTurn).toBe('USER');
+    expect(current.json().game.storyThreadSummary.currentPhase).toBeTruthy();
+    expect(current.json().game.storyThreadSummary.carryForward).toBeTruthy();
   });
 
   it('should reject login with wrong password', async () => {
