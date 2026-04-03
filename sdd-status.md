@@ -5,14 +5,14 @@
 - 当前状态：有效
 - 所属阶段：状态总览
 - 所属项目：象棋网页版项目（暂定）
-- 所属功能 / 子功能：Implement / Task Bundle C（AI 决策与演绎体验二轮修正）
+- 所属功能 / 子功能：Review / Task Bundle C（AI 决策与演绎体验二轮修正）
 - 上游文档：docs/需求分析结论.md
 - 创建时间：2026-03-26
 - 最后更新时间：2026-04-03
 
 ## 1. 当前阶段
-- 当前阶段：Implement（Task Bundle C 已形成稳定快照，可进入 Review / Acceptance 判断）
-- 当前阶段状态：Task Bundle A 已完成回收并推送；Task Bundle B 已按确认边界完成实现、验证、主会话回收与提交；Task Bundle C 首轮已完成真实代码实现与技术验收，但真实手机走查未通过。围绕“演绎质量偏模板化”的极窄精修现已完成，且短人工复核已明确给出“通过，可以收口”结论。当前相关代码、测试、验收与状态文档已整理为稳定快照，因此当前口径已从“Bundle C 可阶段性收口、仓库快照待收稳”切换为“Bundle C 已形成稳定快照，可进入 Review / Acceptance 判断”。
+- 当前阶段：Review（Task Bundle C review 已确认收口）
+- 当前阶段状态：Task Bundle A 已完成回收并推送；Task Bundle B 已按确认边界完成实现、验证、主会话回收与提交；Task Bundle C 首轮已完成真实代码实现与技术验收，后续围绕“演绎质量偏模板化”的极窄精修已完成，短人工复核已明确给出“通过，可以收口”结论。当前 `review.md` 与 `sdd-status.md` 已同步回写到确认状态，当前结论为：**Task Bundle C 有条件通过 / 阶段性通过，且本轮 review 已确认收口。**
 
 ## 2. 各核心文档状态
 ### spec.md
@@ -28,12 +28,12 @@
 ### tasks.md
 - 状态：已创建（已确认）
 - 是否已确认：是
-- 备注：已补清 Task Bundle C / D 在主题切换与偏好持久化上的边界；当前 Task Bundle C 已形成稳定快照
+- 备注：已补清 Task Bundle C / D 在主题切换与偏好持久化上的边界；Task Bundle C 当前轮 review 已确认收口
 
 ### execution-contract.md
 - 状态：已创建（已确认）
 - 是否已确认：是
-- 备注：Task Bundle C 二轮修正执行协议已完成本轮使命；当前已完成稳定快照整理
+- 备注：Task Bundle C 二轮修正执行协议已完成本轮使命；当前已完成稳定快照整理与 review 收口
 
 ### docs/Task Bundle C 实现交接.md
 - 状态：已创建（已确认）
@@ -41,29 +41,29 @@
 - 备注：本轮交接使命已完成；当前不再新开实现范围
 
 ### review.md
-- 状态：未创建
-- 是否已确认：否
-- 备注：Bundle C 已形成稳定快照；是否正式进入 Review / Acceptance，可作为下一步判断
+- 状态：已创建（已确认）
+- 是否已确认：是
+- 备注：`/root/.openclaw/workspace/xiangqi-web/review.md` 已完成当前轮 Review 收口；当前结论为“Task Bundle C 有条件通过 / 阶段性通过”
 
 ## 3. 当前中断点
 ### 上次停在什么位置
-Task Bundle C 围绕“演绎模板化”完成了最后一轮极窄精修：事件叙述模板化、turn 的 consensus / decision / review 句法重复，以及 highlight 收尾重复感均已继续下压；相关代码、测试与构建结果已由主会话回收。随后按超短清单完成短人工复核，用户明确给出“通过，可以收口”结论；之后主会话又完成了工作树整理、测试收平与稳定快照回写。
+用户已明确接受当前 review 结论；主会话已据此将 `review.md` 与 `sdd-status.md` 回写为已确认状态。当前本轮不再停在“是否接受 review”，而是停在“review 已收口后，下一步到底进入 Bundle D 还是开启新的增量 SDD”。
 
 ### 为什么停下
-当前不再卡在代码实现、统一时间线链路、移动端破坏、自动验证失败、人工复核结论未定，或“仓库快照尚未收稳”这些问题，而是刻意停在“Bundle C 已形成稳定快照，等待是否进入 Review / Acceptance”的检查点。
+当前不再卡在代码实现、统一时间线链路、移动端破坏、自动验证失败、人工复核结论未定，或“review 草案待确认”这些问题，而是刻意停在“当前轮 review 已确认收口，等待下一轮方向判断”的检查点。
 
 ### 恢复时应先处理什么
-不要继续磨 Bundle C 文案，也不要默认立即进入 Bundle D。恢复时应先基于当前稳定快照，判断是否进入 Review / Acceptance；若不进入，再决定是否开启后续增量工作。
+不要继续磨 Bundle C 文案，也不要把当前已确认结论重新打回草案。恢复时应先基于当前已确认的 review 结论，判断下一步是进入 Task Bundle D，还是按新的增量问题重新起一轮 SDD。
 
 ## 4. 下一步唯一推荐动作
-直接执行 **Bundle C 收口后的阶段判断**：
-1. 基于当前稳定快照，确认是否进入 Review / Acceptance
-2. 若进入，则补齐对应 review / acceptance 材料
-3. 若暂不进入，则明确后续是 Bundle D 还是增量 SDD
+直接执行 **review 收口后的下一轮方向判断**：
+1. 判断是直接进入 Task Bundle D
+2. 还是围绕新的增量目标重新起一轮轻量 / 完整 SDD
+3. 若暂不推进，则保持当前轮已确认收口状态，不再继续改写 Bundle C 结论
 
 ## 5. 当前阻塞 / 未决问题
 - 当前无新的关键技术阻塞
-- 当前无新的演绎质量未决问题；短人工复核已给出“通过，可以收口”结论
+- 当前无新的演绎质量未决问题；短人工复核已给出“通过，可以收口”结论，且用户已接受当前 review 结论
 - 当前口径修正：文档中的“决策 AI / 演绎 AI”在当前版本应按职责分层理解；当前代码仍未接入外部大模型
 - 当前已过线项：
   - 独立标准决策层（规则 + 启发式评分）已接入并通过构建验证
@@ -72,11 +72,14 @@ Task Bundle C 围绕“演绎模板化”完成了最后一轮极窄精修：事
   - 移动端主链路未被二轮修正破坏
   - 数据库链路、集成测试与全量测试已完成回收
   - 围绕模板化的极窄精修已完成；事件叙述、turn 的 consensus / decision / review 与 highlight 句法重复感已继续下压
-  - 短人工复核已通过，Bundle C 已形成稳定快照
+  - 当前 review 结论已被用户接受并完成状态回写
 - 当前未决项：
-  - Bundle C 稳定快照之后，下一步是先进入 Review / Acceptance，还是转入后续增量工作
+  - 下一步是先进入 Bundle D，还是开启新的增量 SDD
 
 ## 6. 最近执行痕迹摘要
+- [2026-04-03] 用户确认接受当前 review 结论；主会话已将 `review.md` 与 `sdd-status.md` 回写为已确认收口状态
+- [2026-04-03] 主会话确认 `review.md` 已形成 Task Bundle C 当前轮 Review 草案，当前建议结论为“有条件通过 / 阶段性通过”，待用户确认
+- [2026-04-03] 主会话执行 `git status --short`，确认已检查本轮收口所需工作树状态
 - [2026-04-03] 主会话按稳定快照口径回写 `docs/Task Bundle C 验收结论.md` 与本状态卡
 - [2026-04-03] 主会话收紧 `tests/web/presentation.spec.ts` 断言口径，改为语义稳定断言
 - [2026-04-03] 主会话执行 `npm test`，结果 21/21 通过
@@ -120,7 +123,7 @@ Task Bundle C 围绕“演绎模板化”完成了最后一轮极窄精修：事
 
 ## 7. 当前执行范围（Implement 阶段重点填写）
 ### 当前正在执行
-- 当前无新的代码实现进行中；Task Bundle C 已形成稳定快照，当前停在收口后的阶段判断点
+- 当前无新的代码实现进行中；当前轮 review 已确认收口，等待下一轮方向判断
 
 ### 当前已完成
 - 项目启动与需求讨论的第一轮收口
@@ -142,9 +145,10 @@ Task Bundle C 围绕“演绎模板化”完成了最后一轮极窄精修：事
 - Task Bundle C 极窄精修后的自动验证与抽样文本复核：已完成回收
 - Task Bundle C 短人工复核：已完成，结论为“通过，可以收口”
 - Task Bundle C 稳定快照整理：已完成
+- Task Bundle C 当前轮 Review：已确认收口
 
 ### 当前未完成
-- Bundle C 稳定快照后的下一阶段动作确定
+- 尚未决定下一步是进入 Bundle D 还是开启新的增量 SDD
 
 ### 当前验证情况
 - `npm run build --workspace @xiangqi-web/server` 通过
@@ -156,23 +160,24 @@ Task Bundle C 围绕“演绎模板化”完成了最后一轮极窄精修：事
 - 极窄精修后追加验证：`npm test` 再次通过（21/21），`npm run build` 再次通过
 - 稳定快照整理时追加验证：`npm test` 再次通过（21/21），`npm run build` 再次通过
 - 短人工复核结论：通过，可以收口
-- 当前状态结论：Bundle C 已形成稳定快照；当前只剩下一阶段动作判断
+- 当前状态结论：Task Bundle C 当前轮 review 已确认收口；当前结论为有条件通过 / 阶段性通过
 
 ## 8. 当前实现执行状态
 - 当前执行代理：主会话已完成结果回收；当前无新的执行代理运行中
-- 当前执行模式：主会话回收 / 稳定快照已完成
+- 当前执行模式：主会话回收 / review 收口已完成
 - 当前会话策略：单任务隔离
 - 当前 repo / cwd：xiangqi-web
 - 当前轮次：项目启动 / Task Bundle C 二轮修正
 - 当前 task bundle：Task Bundle C（AI 决策与演绎体验二轮修正）
-- 当前执行状态：bundle-c-stable-snapshot-ready-for-review-decision
-- 最近一次执行结果：Task Bundle C 已形成稳定快照，可进入 Review / Acceptance 判断
-- 当前会话是否仍可复用：是（仅用于处理阶段判断与后续承接；不应用于继续扩散实现范围）
+- 当前执行状态：review-confirmed-awaiting-next-direction
+- 最近一次执行结果：Task Bundle C review 已确认收口，等待下一轮方向判断
+- 当前会话是否仍可复用：是（仅用于承接下一轮方向判断；不应用于继续扩散已收口范围）
 
 ## 9. 恢复提示
 默认恢复顺序：
 1. 先看本状态卡
-2. 再读 `docs/Task Bundle C 人工走查结果.md`
-3. 再读 `docs/Task Bundle C 验收结论.md`
-4. 先判断是否进入 Review / Acceptance
-5. 再决定是否进入后续增量工作
+2. 再读 `review.md`
+3. 再读 `docs/Task Bundle C 人工走查结果.md`
+4. 再读 `docs/Task Bundle C 验收结论.md`
+5. 先判断下一步是进入 Bundle D 还是新的增量 SDD
+6. 再决定后续交接或继续方式
