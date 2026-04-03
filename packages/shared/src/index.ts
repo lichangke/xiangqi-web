@@ -56,6 +56,24 @@ export type AuthUser = {
   status: UserStatus;
 };
 
+export type UserPreferences = {
+  theme: ThemeKey;
+  boardOrientation: string;
+  discussionDefaultOpen: boolean;
+  narrativeStylePreference: string | null;
+};
+
+export type RecentGameSummary = {
+  id: string;
+  difficulty: Difficulty;
+  status: GameStatus;
+  startedAt: string;
+  endedAt: string | null;
+  endedByResign: boolean;
+  undoCount: number;
+  resultWinner: SideColor | null;
+};
+
 export type LoginRequest = {
   username: string;
   password: string;
@@ -64,6 +82,22 @@ export type LoginRequest = {
 export type LoginResponse = {
   token: string;
   user: AuthUser;
+  preferences: UserPreferences;
+  recentGames: RecentGameSummary[];
+};
+
+export type GetMeResponse = {
+  user: AuthUser;
+  preferences: UserPreferences;
+  recentGames: RecentGameSummary[];
+};
+
+export type UpdatePreferencesRequest = {
+  theme: ThemeKey;
+};
+
+export type UpdatePreferencesResponse = {
+  preferences: UserPreferences;
 };
 
 export type CreateGameRequest = {

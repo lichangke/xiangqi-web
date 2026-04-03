@@ -724,3 +724,25 @@ input {
     min-height: 300px;
   }
 }
+
+.recent-games-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.recent-games-list li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+}
+
+.recent-games-list strong {
+  color: var(--text-primary);
+}

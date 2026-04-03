@@ -84,7 +84,34 @@ beforeEach(async () => {
 });
 
 describe('auth and game APIs', () => {
-  it('should login and read current user profile', async () => {
+  it('should login and read current user profile with preferences and recent games', async () => {
+    await prisma.userPreference.update({
+      where: { userId: demoUserId },
+      data: { theme: 'midnight' },
+    });
+
+    await prisma.gameSession.create({
+      data: {
+        userId: demoUserId,
+        difficulty: 'NORMAL',
+        status: 'RESIGNED',
+        initialFen: 'fen-a',
+        currentFen: 'fen-a',
+        endedByResign: true,
+        endedAt: new Date(),
+      },
+    });
+
+    const relogin = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { username: 'demo', password: 'demo123' },
+    });
+
+    expect(relogin.statusCode).toBe(200);
+    expect(relogin.json().preferences.theme).toBe('midnight');
+    expect(relogin.json().recentGames).toHaveLength(1);
+
     const me = await app.inject({
       method: 'GET',
       url: '/api/auth/me',
@@ -93,6 +120,8 @@ describe('auth and game APIs', () => {
 
     expect(me.statusCode).toBe(200);
     expect(me.json().user.username).toBe('demo');
+    expect(me.json().preferences.theme).toBe('midnight');
+    expect(Array.isArray(me.json().recentGames)).toBe(true);
   });
 
   it('should create a game and then read current ongoing game', async () => {
@@ -133,6 +162,24 @@ describe('auth and game APIs', () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json().user.username).toBe('player-a');
+  });
+
+  it('should update and persist theme preferences', async () => {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/auth/preferences',
+      headers: {
+        authorization: `Bearer ${demoToken}`,
+        'content-type': 'application/json',
+      },
+      payload: { theme: 'ink' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().preferences.theme).toBe('ink');
+
+    const storedPreference = await prisma.userPreference.findUniqueOrThrow({ where: { userId: demoUserId } });
+    expect(storedPreference.theme).toBe('ink');
   });
 
   it('should enforce one ongoing game per user', async () => {

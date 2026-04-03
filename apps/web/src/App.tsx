@@ -4,11 +4,15 @@ import type {
   Difficulty,
   GameSummary,
   GetCurrentGameResponse,
+  GetMeResponse,
   LoginResponse,
+  RecentGameSummary,
   ResignGameResponse,
   SubmitMoveResponse,
   ThemeKey,
+  UpdatePreferencesResponse,
   UndoGameResponse,
+  UserPreferences,
 } from '@xiangqi-web/shared';
 import {
   THEME_OPTIONS,
@@ -139,6 +143,8 @@ export function App() {
   const [actionLoading, setActionLoading] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [theme, setTheme] = useState<ThemeKey>('classic');
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [recentGames, setRecentGames] = useState<RecentGameSummary[]>([]);
   const [discussionOpen, setDiscussionOpen] = useState(false);
   const [compactLayout, setCompactLayout] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'timeline' | 'status' | 'settings'>('timeline');
@@ -153,6 +159,38 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    if (!token || !preferences || preferences.theme === theme) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void requestJson<UpdatePreferencesResponse>('/api/auth/preferences', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ theme }),
+        signal: controller.signal,
+      })
+        .then((data) => setPreferences(data.preferences))
+        .catch((preferenceError) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          const normalized = normalizeApiError(preferenceError);
+          setError(normalized.detail ?? normalized.message);
+        });
+    }, 180);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [preferences, theme, token]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 980px)');
@@ -209,6 +247,16 @@ export function App() {
     setRuntimeEvents([]);
   }
 
+  async function loadProfile(nextToken: string) {
+    const data = await requestJson<GetMeResponse>('/api/auth/me', {
+      headers: { Authorization: `Bearer ${nextToken}` },
+    });
+    setProfileName(data.user.username);
+    setPreferences(data.preferences);
+    setTheme(data.preferences.theme);
+    setRecentGames(data.recentGames);
+  }
+
   async function handleLogin(event: React.FormEvent) {
     event.preventDefault();
     setLoginLoading(true);
@@ -224,6 +272,9 @@ export function App() {
 
       setToken(data.token);
       setProfileName(data.user.username);
+      setPreferences(data.preferences);
+      setTheme(data.preferences.theme);
+      setRecentGames(data.recentGames);
       await loadCurrentGame(data.token);
       setMessage('登录成功，可以直接新开一局，或继续当前棋局。');
     } catch (loginError) {
@@ -231,6 +282,9 @@ export function App() {
       setProfileName('');
       setCurrentGame(null);
       setRuntimeEvents([]);
+      setPreferences(null);
+      setRecentGames([]);
+      setTheme('classic');
       setError(parseApiError(loginError));
     } finally {
       setLoginLoading(false);
@@ -258,6 +312,7 @@ export function App() {
       setCurrentGame(data.game);
       setSelectedSquare(null);
       setRuntimeEvents([]);
+      await loadProfile(token);
       setMessage(`已创建 ${formatDifficulty(difficulty)} 对局，统一时间线会按回合与事件逐段展开。`);
     } catch (createError) {
       const normalized = normalizeApiError(createError);
@@ -356,6 +411,7 @@ export function App() {
       });
       setCurrentGame(data.game);
       setSelectedSquare(null);
+      await loadProfile(token);
       setMessage(`已撤销第 ${data.revertedTurnNumber} 回合，轮到你重新落子。`);
       setRuntimeEvents((previous) => [
         buildUndoEvent(data.game, theme, data.revertedTurnNumber, getNextTimelineOrder(data.game, previous)),
@@ -388,6 +444,7 @@ export function App() {
       });
       setCurrentGame(data.game);
       setSelectedSquare(null);
+      await loadProfile(token);
       setMessage('你已认输，本局结束。');
       setRuntimeEvents((previous) => [
         buildFinishEvent(data.game, theme, getNextTimelineOrder(data.game, previous)),
@@ -414,6 +471,9 @@ export function App() {
     setError('');
     setRuntimeEvents([]);
     setRevealedSegmentCounts({});
+    setPreferences(null);
+    setRecentGames([]);
+    setTheme('classic');
   }
 
   function renderStatusCard() {
@@ -543,7 +603,7 @@ export function App() {
             <p className="section-kicker">设置</p>
             <h2>主题切换</h2>
           </div>
-          <span className="state-pill">即时生效</span>
+          <span className="state-pill">登录后恢复</span>
         </div>
 
         <div className="theme-grid" role="radiogroup" aria-label="页面主题切换">
@@ -560,7 +620,7 @@ export function App() {
           ))}
         </div>
 
-        <p className="hint">当前只做展示层即时切换，不做登录后恢复与跨端同步。</p>
+        <p className="hint">当前主题会保存到账号偏好中，下次重新登录后自动恢复。</p>
       </section>
     );
   }
@@ -602,7 +662,7 @@ export function App() {
         <div>
           <p className="eyebrow">Task Bundle C / 统一演绎时间线</p>
           <h1>你好，{profileName}</h1>
-          <p className="lead">当前页面已切到统一时间线：合法回合、非法步、悔棋、将军与终局都进入同一条讨论链路。</p>
+          <p className="lead">当前页面已切到统一时间线：合法回合、非法步、悔棋、将军与终局都进入同一条讨论链路。当前主题会跟随账号偏好恢复。</p>
         </div>
         <div className="hero-actions">
           {compactLayout ? (
@@ -680,6 +740,29 @@ export function App() {
               </div>
             ) : null}
           </div>
+
+          <section className="card quick-actions-card">
+            <div className="section-head">
+              <div>
+                <p className="section-kicker">最近对局</p>
+                <h2>账号摘要</h2>
+              </div>
+              <span className="state-pill">最多展示 5 局</span>
+            </div>
+            {recentGames.length ? (
+              <ul className="recent-games-list">
+                {recentGames.map((game) => (
+                  <li key={game.id}>
+                    <strong>{formatDifficulty(game.difficulty)}</strong>
+                    <span>{STATUS_LABELS[game.status]}</span>
+                    <span>{game.endedByResign ? '认输结束' : game.resultWinner ? `胜方：${game.resultWinner === 'red' ? '红方' : '黑方'}` : '未决 / 和局'}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="hint">登录后会在这里显示最近几局对局摘要。</p>
+            )}
+          </section>
 
           <section className="card quick-actions-card">
             <div className="section-head">

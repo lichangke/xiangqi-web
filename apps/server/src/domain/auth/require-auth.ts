@@ -13,9 +13,16 @@ function getToken(request: FastifyRequest) {
   return header.slice('Bearer '.length);
 }
 
-export async function requireUser(request: FastifyRequest, prisma: PrismaClient) {
+export async function requireUser(
+  request: FastifyRequest,
+  prisma: PrismaClient,
+  options?: { includePreferences?: boolean },
+) {
   const payload = verifyToken(getToken(request));
-  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    include: options?.includePreferences ? { preferences: true } : undefined,
+  });
 
   if (!user || user.status === UserStatus.DISABLED) {
     throw new HttpError(403, 'AUTH_DISABLED', '账号不可用');
