@@ -3,8 +3,11 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import {
   getModelRuntimeStatus,
+  getRuntimePolicy,
   listAdminModelConfigs,
+  listAuditSummary,
   publicUser,
+  updateRuntimePolicy,
   upsertAdminModelConfig,
 } from '../domain/auth/auth-service.js';
 import { requireAdmin } from '../domain/auth/require-auth.js';
@@ -34,6 +37,17 @@ const updateModelConfigSchema = z.object({
   apiKey: z.string().optional(),
   thinkingLevel: z.string().min(1).default('normal'),
   enabled: z.boolean(),
+});
+
+const updateRuntimePolicySchema = z.object({
+  maxConcurrentAiGames: z.number().int().min(1).max(500),
+  maxOngoingGamesPerUser: z.number().int().min(1).max(20),
+  registrationMode: z.enum(['CLOSED', 'INVITE_ONLY', 'OPEN']),
+  maxUndoPerGame: z.number().int().min(0).max(20),
+});
+
+const auditQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(10),
 });
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -161,5 +175,33 @@ export async function adminRoutes(app: FastifyInstance) {
     const config = await upsertAdminModelConfig(app.prisma, admin.id, params.data.configKey, parsed.data);
     const modelRuntimeStatus = await getModelRuntimeStatus(app.prisma);
     return reply.send({ config, modelRuntimeStatus });
+  });
+
+  app.get('/api/admin/runtime-policy', async (request, reply) => {
+    await requireAdmin(request, app.prisma);
+    const runtimePolicy = await getRuntimePolicy(app.prisma);
+    return reply.send({ runtimePolicy });
+  });
+
+  app.put('/api/admin/runtime-policy', async (request, reply) => {
+    const admin = await requireAdmin(request, app.prisma);
+    const parsed = updateRuntimePolicySchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw new HttpError(400, 'ADMIN_BAD_REQUEST', '运行策略参数不合法');
+    }
+
+    const runtimePolicy = await updateRuntimePolicy(app.prisma, admin.id, parsed.data);
+    return reply.send({ runtimePolicy });
+  });
+
+  app.get('/api/admin/audit-summary', async (request, reply) => {
+    await requireAdmin(request, app.prisma);
+    const parsed = auditQuerySchema.safeParse(request.query ?? {});
+    if (!parsed.success) {
+      throw new HttpError(400, 'ADMIN_BAD_REQUEST', '审计摘要查询参数不合法');
+    }
+
+    const items = await listAuditSummary(app.prisma, parsed.data.limit);
+    return reply.send({ items });
   });
 }

@@ -1,12 +1,14 @@
-import type { PrismaClient, ModelConfig } from '@prisma/client';
+import type { PrismaClient, ModelConfig, RegistrationMode, RuntimePolicy } from '@prisma/client';
 import { UserStatus, type Difficulty, type GameSession, type User } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import type {
   AdminModelConfig,
+  AuditSummaryItem,
   ModelConfigKey,
   ModelRuntimeStatus,
   RecentGameSummary,
+  RuntimePolicySummary,
   ThemeKey,
   UserPreferences,
 } from '@xiangqi-web/shared';
@@ -243,6 +245,86 @@ export async function upsertAdminModelConfig(
   return toAdminModelConfig(record);
 }
 
+export async function getRuntimePolicy(prisma: PrismaClient): Promise<RuntimePolicySummary> {
+  const policy = await prisma.runtimePolicy.upsert({
+    where: { policyKey: 'system' },
+    update: {},
+    create: {
+      policyKey: 'system',
+      maxConcurrentAiGames: 20,
+      maxOngoingGamesPerUser: 1,
+      maxUndoPerGame: 5,
+      registrationMode: 'CLOSED',
+    },
+  });
+
+  return toRuntimePolicySummary(policy);
+}
+
+export async function updateRuntimePolicy(
+  prisma: PrismaClient,
+  actorUserId: string,
+  payload: {
+    maxConcurrentAiGames: number;
+    maxOngoingGamesPerUser: number;
+    registrationMode: RegistrationMode;
+    maxUndoPerGame: number;
+  },
+): Promise<RuntimePolicySummary> {
+  const policy = await prisma.runtimePolicy.upsert({
+    where: { policyKey: 'system' },
+    update: {
+      maxConcurrentAiGames: payload.maxConcurrentAiGames,
+      maxOngoingGamesPerUser: payload.maxOngoingGamesPerUser,
+      registrationMode: payload.registrationMode,
+      maxUndoPerGame: payload.maxUndoPerGame,
+    },
+    create: {
+      policyKey: 'system',
+      maxConcurrentAiGames: payload.maxConcurrentAiGames,
+      maxOngoingGamesPerUser: payload.maxOngoingGamesPerUser,
+      registrationMode: payload.registrationMode,
+      maxUndoPerGame: payload.maxUndoPerGame,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId,
+      action: 'admin.runtime-policy.update',
+      targetType: 'runtime-policy',
+      targetId: policy.id,
+      summary: '更新系统运行策略',
+      payload: JSON.stringify({
+        maxConcurrentAiGames: policy.maxConcurrentAiGames,
+        maxOngoingGamesPerUser: policy.maxOngoingGamesPerUser,
+        registrationMode: policy.registrationMode,
+        maxUndoPerGame: policy.maxUndoPerGame,
+      }),
+    },
+  });
+
+  return toRuntimePolicySummary(policy);
+}
+
+export async function listAuditSummary(prisma: PrismaClient, limit = 10): Promise<AuditSummaryItem[]> {
+  const logs = await prisma.auditLog.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    include: { actor: true },
+  });
+
+  return logs.map((log) => ({
+    id: log.id,
+    action: log.action,
+    targetType: log.targetType,
+    targetId: log.targetId ?? null,
+    summary: log.summary,
+    actorUsername: log.actor?.username ?? null,
+    createdAt: log.createdAt.toISOString(),
+  }));
+}
+
 function normalizeTheme(theme: string | null | undefined): ThemeKey {
   return theme === 'ink' || theme === 'midnight' ? theme : 'classic';
 }
@@ -277,6 +359,18 @@ function buildDefaultAdminModelConfig(configKey: ModelConfigKey): AdminModelConf
     isConfigured: false,
     createdAt: null,
     updatedAt: null,
+  };
+}
+
+function toRuntimePolicySummary(policy: RuntimePolicy): RuntimePolicySummary {
+  return {
+    policyKey: policy.policyKey,
+    maxConcurrentAiGames: policy.maxConcurrentAiGames,
+    maxOngoingGamesPerUser: policy.maxOngoingGamesPerUser,
+    registrationMode: policy.registrationMode as RuntimePolicySummary['registrationMode'],
+    maxUndoPerGame: policy.maxUndoPerGame,
+    createdAt: policy.createdAt.toISOString(),
+    updatedAt: policy.updatedAt.toISOString(),
   };
 }
 

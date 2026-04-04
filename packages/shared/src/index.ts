@@ -10,6 +10,9 @@ export type UserStatus = (typeof USER_STATUSES)[number];
 export const GAME_STATUSES = ['ONGOING', 'CHECKMATED', 'STALEMATE', 'RESIGNED', 'DRAW'] as const;
 export type GameStatus = (typeof GAME_STATUSES)[number];
 
+export const REGISTRATION_MODES = ['CLOSED', 'INVITE_ONLY', 'OPEN'] as const;
+export type RegistrationMode = (typeof REGISTRATION_MODES)[number];
+
 export const THEMES = ['classic', 'ink', 'midnight'] as const;
 export type ThemeKey = (typeof THEMES)[number];
 
@@ -97,6 +100,26 @@ export type ModelRuntimeStatus = {
   message: string | null;
 };
 
+export type RuntimePolicySummary = {
+  policyKey: string;
+  maxConcurrentAiGames: number;
+  maxOngoingGamesPerUser: number;
+  registrationMode: RegistrationMode;
+  maxUndoPerGame: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type AuditSummaryItem = {
+  id: string;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  summary: string;
+  actorUsername: string | null;
+  createdAt: string;
+};
+
 export type LoginRequest = {
   username: string;
   password: string;
@@ -141,6 +164,25 @@ export type UpdateAdminModelConfigRequest = {
 export type UpdateAdminModelConfigResponse = {
   config: AdminModelConfig;
   modelRuntimeStatus: ModelRuntimeStatus;
+};
+
+export type GetRuntimePolicyResponse = {
+  runtimePolicy: RuntimePolicySummary;
+};
+
+export type UpdateRuntimePolicyRequest = {
+  maxConcurrentAiGames: number;
+  maxOngoingGamesPerUser: number;
+  registrationMode: RegistrationMode;
+  maxUndoPerGame: number;
+};
+
+export type UpdateRuntimePolicyResponse = {
+  runtimePolicy: RuntimePolicySummary;
+};
+
+export type GetAuditSummaryResponse = {
+  items: AuditSummaryItem[];
 };
 
 export type CreateGameRequest = {

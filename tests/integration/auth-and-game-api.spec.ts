@@ -405,4 +405,98 @@ describe('auth and game APIs', () => {
     expect(response.statusCode).toBe(503);
     expect(response.json().error.code).toBe('MODEL_NOT_CONFIGURED');
   });
+
+  it('should allow admin to read and update runtime policy', async () => {
+    const readResponse = await app.inject({
+      method: 'GET',
+      url: '/api/admin/runtime-policy',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(readResponse.statusCode).toBe(200);
+    expect(readResponse.json().runtimePolicy.maxOngoingGamesPerUser).toBe(1);
+
+    const updateResponse = await app.inject({
+      method: 'PUT',
+      url: '/api/admin/runtime-policy',
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json',
+      },
+      payload: {
+        maxConcurrentAiGames: 12,
+        maxOngoingGamesPerUser: 2,
+        registrationMode: 'INVITE_ONLY',
+        maxUndoPerGame: 4,
+      },
+    });
+
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json().runtimePolicy.maxConcurrentAiGames).toBe(12);
+    expect(updateResponse.json().runtimePolicy.maxOngoingGamesPerUser).toBe(2);
+    expect(updateResponse.json().runtimePolicy.registrationMode).toBe('INVITE_ONLY');
+  });
+
+  it('should expose lightweight audit summary for admin operations', async () => {
+    await app.inject({
+      method: 'PUT',
+      url: '/api/admin/runtime-policy',
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json',
+      },
+      payload: {
+        maxConcurrentAiGames: 15,
+        maxOngoingGamesPerUser: 1,
+        registrationMode: 'CLOSED',
+        maxUndoPerGame: 5,
+      },
+    });
+
+    const auditResponse = await app.inject({
+      method: 'GET',
+      url: '/api/admin/audit-summary?limit=5',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(auditResponse.statusCode).toBe(200);
+    expect(auditResponse.json().items.length).toBeGreaterThan(0);
+    expect(auditResponse.json().items[0].action).toBeTruthy();
+    expect(auditResponse.json().items[0].summary).toBeTruthy();
+  });
+
+  it('should apply runtime policy when allowing multiple ongoing games per user', async () => {
+    await app.inject({
+      method: 'PUT',
+      url: '/api/admin/runtime-policy',
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json',
+      },
+      payload: {
+        maxConcurrentAiGames: 20,
+        maxOngoingGamesPerUser: 2,
+        registrationMode: 'CLOSED',
+        maxUndoPerGame: 5,
+      },
+    });
+
+    const firstResponse = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: { authorization: `Bearer ${demoToken}` },
+      payload: { difficulty: 'NORMAL' },
+    });
+
+    const secondResponse = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: { authorization: `Bearer ${demoToken}` },
+      payload: { difficulty: 'HARD' },
+    });
+
+    expect(firstResponse.statusCode).toBe(201);
+    expect(secondResponse.statusCode).toBe(201);
+  });
+
 });

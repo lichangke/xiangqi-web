@@ -2,9 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import type {
   AdminModelConfig,
+  AuditSummaryItem,
   GetAdminModelConfigsResponse,
+  GetAuditSummaryResponse,
+  GetRuntimePolicyResponse,
   LoginResponse,
+  RegistrationMode,
+  RuntimePolicySummary,
   UpdateAdminModelConfigResponse,
+  UpdateRuntimePolicyResponse,
 } from '@xiangqi-web/shared';
 import './styles.css';
 
@@ -23,6 +29,13 @@ type DraftsState = Record<string, {
   thinkingLevel: string;
   enabled: boolean;
 }>;
+
+type RuntimePolicyDraft = {
+  maxConcurrentAiGames: number;
+  maxOngoingGamesPerUser: number;
+  registrationMode: RegistrationMode;
+  maxUndoPerGame: number;
+};
 
 async function requestJson<T>(url: string, init?: RequestInit) {
   const response = await fetch(url, init);
@@ -52,17 +65,35 @@ function buildInitialDrafts(configs: AdminModelConfig[]): DraftsState {
   return Object.fromEntries(configs.map((config) => [config.configKey, toDraft(config)]));
 }
 
+function toRuntimePolicyDraft(policy: RuntimePolicySummary): RuntimePolicyDraft {
+  return {
+    maxConcurrentAiGames: policy.maxConcurrentAiGames,
+    maxOngoingGamesPerUser: policy.maxOngoingGamesPerUser,
+    registrationMode: policy.registrationMode,
+    maxUndoPerGame: policy.maxUndoPerGame,
+  };
+}
+
+function formatAuditMeta(item: AuditSummaryItem) {
+  const who = item.actorUsername ? `操作者：${item.actorUsername}` : '操作者：系统';
+  return `${who} · ${new Date(item.createdAt).toLocaleString('zh-CN')}`;
+}
+
 function AdminApp() {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('admin123');
   const [token, setToken] = useState('');
   const [configs, setConfigs] = useState<AdminModelConfig[]>([]);
   const [drafts, setDrafts] = useState<DraftsState>({});
+  const [runtimePolicy, setRuntimePolicy] = useState<RuntimePolicySummary | null>(null);
+  const [runtimePolicyDraft, setRuntimePolicyDraft] = useState<RuntimePolicyDraft | null>(null);
+  const [auditItems, setAuditItems] = useState<AuditSummaryItem[]>([]);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [savingRuntimePolicy, setSavingRuntimePolicy] = useState(false);
   const [runtimeNotice, setRuntimeNotice] = useState('');
 
   const hasEnabledConfig = useMemo(() => configs.some((config) => config.enabled && config.isConfigured), [configs]);
@@ -70,12 +101,24 @@ function AdminApp() {
   async function loadConfigs(nextToken: string) {
     setLoadingConfigs(true);
     try {
-      const data = await requestJson<GetAdminModelConfigsResponse>('/api/admin/model-configs', {
-        headers: { Authorization: `Bearer ${nextToken}` },
-      });
-      setConfigs(data.configs);
-      setDrafts(buildInitialDrafts(data.configs));
-      setRuntimeNotice(data.modelRuntimeStatus.message ?? '后台已具备最小模型配置入口。');
+      const [configsData, runtimePolicyData, auditData] = await Promise.all([
+        requestJson<GetAdminModelConfigsResponse>('/api/admin/model-configs', {
+          headers: { Authorization: `Bearer ${nextToken}` },
+        }),
+        requestJson<GetRuntimePolicyResponse>('/api/admin/runtime-policy', {
+          headers: { Authorization: `Bearer ${nextToken}` },
+        }),
+        requestJson<GetAuditSummaryResponse>('/api/admin/audit-summary?limit=8', {
+          headers: { Authorization: `Bearer ${nextToken}` },
+        }),
+      ]);
+
+      setConfigs(configsData.configs);
+      setDrafts(buildInitialDrafts(configsData.configs));
+      setRuntimeNotice(configsData.modelRuntimeStatus.message ?? '后台已具备最小模型配置入口。');
+      setRuntimePolicy(runtimePolicyData.runtimePolicy);
+      setRuntimePolicyDraft(toRuntimePolicyDraft(runtimePolicyData.runtimePolicy));
+      setAuditItems(auditData.items);
     } finally {
       setLoadingConfigs(false);
     }
@@ -100,11 +143,14 @@ function AdminApp() {
 
       setToken(data.token);
       await loadConfigs(data.token);
-      setMessage('管理员登录成功，可以开始补齐模型配置。');
+      setMessage('管理员登录成功，可以继续推进模型配置、运行策略与审计摘要。');
     } catch (loginError) {
       setToken('');
       setConfigs([]);
       setDrafts({});
+      setRuntimePolicy(null);
+      setRuntimePolicyDraft(null);
+      setAuditItems([]);
       setError(parseApiError(loginError));
     } finally {
       setLoginLoading(false);
@@ -138,6 +184,10 @@ function AdminApp() {
       }));
       setRuntimeNotice(data.modelRuntimeStatus.message ?? '至少已有一个模型配置启用，前台可继续新开对局。');
       setMessage(`已保存 ${configKey === 'decision' ? '对局决策' : '演绎'} 模型配置。`);
+      const auditData = await requestJson<GetAuditSummaryResponse>('/api/admin/audit-summary?limit=8', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAuditItems(auditData.items);
     } catch (saveError) {
       setError(parseApiError(saveError));
     } finally {
@@ -145,17 +195,52 @@ function AdminApp() {
     }
   }
 
+  async function handleSaveRuntimePolicy() {
+    if (!token || !runtimePolicyDraft) {
+      return;
+    }
+
+    setSavingRuntimePolicy(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const [policyData, auditData] = await Promise.all([
+        requestJson<UpdateRuntimePolicyResponse>('/api/admin/runtime-policy', {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(runtimePolicyDraft),
+        }),
+        requestJson<GetAuditSummaryResponse>('/api/admin/audit-summary?limit=8', {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      setRuntimePolicy(policyData.runtimePolicy);
+      setRuntimePolicyDraft(toRuntimePolicyDraft(policyData.runtimePolicy));
+      setAuditItems(auditData.items);
+      setMessage('已保存运行策略。');
+    } catch (saveError) {
+      setError(parseApiError(saveError));
+    } finally {
+      setSavingRuntimePolicy(false);
+    }
+  }
+
   useEffect(() => {
-    document.title = token ? '象棋后台管理 / 模型配置' : '象棋后台管理';
+    document.title = token ? '象棋后台管理 / 模型配置与运行策略' : '象棋后台管理';
   }, [token]);
 
   if (!token) {
     return (
       <main className="admin-shell">
         <section className="panel login-panel">
-          <p className="tag">Task Bundle D-2.1 / 后台模型配置</p>
+          <p className="tag">Task Bundle D-2.2 / 运行策略与审计摘要</p>
           <h1>管理员登录</h1>
-          <p className="muted">本轮先补齐模型配置管理与“未配置”状态闭环，运行策略和审计摘要留到后续子轮。</p>
+          <p className="muted">本轮聚焦运行策略管理与轻量审计摘要，不在这一轮混入真实模型接入。</p>
           <form className="admin-form" onSubmit={handleLogin}>
             <label>
               用户名
@@ -178,14 +263,17 @@ function AdminApp() {
     <main className="admin-shell admin-app-shell">
       <section className="panel hero-panel">
         <div>
-          <p className="tag">Task Bundle D-2.1 / 模型配置闭环</p>
-          <h1>后台模型配置</h1>
-          <p className="muted">当前先保证管理员能填写模型名称、Base URL、API Key、思考强度并启用配置；前台在未配置时会明确提示，而不是静默失败。</p>
+          <p className="tag">Task Bundle D-2.2 / 运行策略与审计摘要</p>
+          <h1>后台管理</h1>
+          <p className="muted">当前轮继续补齐后台管理面：模型配置保持可用，新增运行策略管理与关键审计摘要查看。</p>
         </div>
         <button type="button" className="ghost-button" onClick={() => {
           setToken('');
           setConfigs([]);
           setDrafts({});
+          setRuntimePolicy(null);
+          setRuntimePolicyDraft(null);
+          setAuditItems([]);
           setMessage('');
           setError('');
         }}>
@@ -203,6 +291,7 @@ function AdminApp() {
             {hasEnabledConfig ? '已有可用模型配置' : '暂无启用中的模型配置'}
           </span>
           <span className="pill">{loadingConfigs ? '加载中…' : `配置条目 ${configs.length}`}</span>
+          {runtimePolicy ? <span className="pill">注册模式：{runtimePolicy.registrationMode}</span> : null}
         </div>
       </section>
 
@@ -295,6 +384,111 @@ function AdminApp() {
             </article>
           );
         })}
+      </section>
+
+      <section className="config-grid two-wide-grid">
+        <article className="panel config-card">
+          <div className="config-card-head">
+            <div>
+              <p className="tag small-tag">Task Bundle D-2.2</p>
+              <h2>运行策略</h2>
+            </div>
+            <span className="pill pill-success">Runtime Policy</span>
+          </div>
+
+          {runtimePolicyDraft ? (
+            <div className="admin-form compact-form">
+              <label>
+                AI 对局并发上限
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={runtimePolicyDraft.maxConcurrentAiGames}
+                  onChange={(event) => setRuntimePolicyDraft((previous) => previous ? {
+                    ...previous,
+                    maxConcurrentAiGames: Number(event.target.value),
+                  } : previous)}
+                />
+              </label>
+
+              <label>
+                单账号同时进行中的对局数上限
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={runtimePolicyDraft.maxOngoingGamesPerUser}
+                  onChange={(event) => setRuntimePolicyDraft((previous) => previous ? {
+                    ...previous,
+                    maxOngoingGamesPerUser: Number(event.target.value),
+                  } : previous)}
+                />
+              </label>
+
+              <label>
+                注册模式
+                <select
+                  value={runtimePolicyDraft.registrationMode}
+                  onChange={(event) => setRuntimePolicyDraft((previous) => previous ? {
+                    ...previous,
+                    registrationMode: event.target.value as RegistrationMode,
+                  } : previous)}
+                >
+                  <option value="CLOSED">CLOSED</option>
+                  <option value="INVITE_ONLY">INVITE_ONLY</option>
+                  <option value="OPEN">OPEN</option>
+                </select>
+              </label>
+
+              <label>
+                每局最大悔棋次数
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={runtimePolicyDraft.maxUndoPerGame}
+                  onChange={(event) => setRuntimePolicyDraft((previous) => previous ? {
+                    ...previous,
+                    maxUndoPerGame: Number(event.target.value),
+                  } : previous)}
+                />
+              </label>
+            </div>
+          ) : <p className="muted">正在加载运行策略…</p>}
+
+          <div className="config-meta">
+            <span>策略键：{runtimePolicy?.policyKey ?? 'system'}</span>
+            <span>最近更新时间：{runtimePolicy?.updatedAt ? new Date(runtimePolicy.updatedAt).toLocaleString('zh-CN') : '暂无'}</span>
+          </div>
+
+          <button type="button" disabled={savingRuntimePolicy || !runtimePolicyDraft} onClick={() => void handleSaveRuntimePolicy()}>
+            {savingRuntimePolicy ? '保存中…' : '保存运行策略'}
+          </button>
+        </article>
+
+        <article className="panel config-card">
+          <div className="config-card-head">
+            <div>
+              <p className="tag small-tag">Task Bundle D-2.2</p>
+              <h2>轻量审计摘要</h2>
+            </div>
+            <span className="pill pill-warning">最近 8 条</span>
+          </div>
+
+          <div className="audit-list">
+            {auditItems.length ? auditItems.map((item) => (
+              <article key={item.id} className="audit-item">
+                <div className="audit-item-head">
+                  <strong>{item.summary}</strong>
+                  <span className="pill">{item.action}</span>
+                </div>
+                <p className="muted">{formatAuditMeta(item)}</p>
+                <p className="hint">目标：{item.targetType}{item.targetId ? ` / ${item.targetId}` : ''}</p>
+              </article>
+            )) : <p className="muted">当前还没有审计摘要记录。</p>}
+          </div>
+        </article>
       </section>
     </main>
   );
