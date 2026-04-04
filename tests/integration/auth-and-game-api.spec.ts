@@ -42,6 +42,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await prisma.auditLog.deleteMany();
   await prisma.gameSession.deleteMany();
+  await prisma.modelConfig.deleteMany();
   await prisma.userPreference.deleteMany();
   await prisma.user.deleteMany();
   await prisma.runtimePolicy.upsert({
@@ -79,6 +80,19 @@ beforeEach(async () => {
   ]);
 
   demoUserId = demo.id;
+  await prisma.modelConfig.create({
+    data: {
+      configKey: 'decision',
+      modelName: 'demo-decision',
+      baseUrl: 'https://api.example.com/v1',
+      apiKeyMaskedHint: 'sk-d***1234',
+      thinkingLevel: 'normal',
+      enabled: true,
+      createdById: admin.id,
+      updatedById: admin.id,
+    },
+  });
+
   adminToken = (await login('admin', 'admin123')).token;
   demoToken = (await login('demo', 'demo123')).token;
 });
@@ -331,5 +345,64 @@ describe('auth and game APIs', () => {
         break;
       }
     }
+  });
+
+
+  it('should expose runtime model status in auth payloads', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { authorization: `Bearer ${demoToken}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().modelRuntimeStatus.hasAnyEnabledModelConfig).toBe(true);
+    expect(response.json().modelRuntimeStatus.decisionConfigured).toBe(true);
+  });
+
+  it('should allow admin to read and update model configs', async () => {
+    const readResponse = await app.inject({
+      method: 'GET',
+      url: '/api/admin/model-configs',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(readResponse.statusCode).toBe(200);
+    expect(readResponse.json().configs).toHaveLength(2);
+
+    const updateResponse = await app.inject({
+      method: 'PUT',
+      url: '/api/admin/model-configs/narrative',
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        'content-type': 'application/json',
+      },
+      payload: {
+        modelName: 'demo-narrative',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-live-narrative-123456',
+        thinkingLevel: 'high',
+        enabled: true,
+      },
+    });
+
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json().config.configKey).toBe('narrative');
+    expect(updateResponse.json().config.enabled).toBe(true);
+    expect(updateResponse.json().config.apiKeyMaskedHint).toContain('***');
+  });
+
+  it('should block creating a game when no enabled model config exists', async () => {
+    await prisma.modelConfig.deleteMany();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/games',
+      headers: { authorization: `Bearer ${demoToken}` },
+      payload: { difficulty: 'NORMAL' },
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error.code).toBe('MODEL_NOT_CONFIGURED');
   });
 });

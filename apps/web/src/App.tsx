@@ -6,6 +6,7 @@ import type {
   GetCurrentGameResponse,
   GetMeResponse,
   LoginResponse,
+  ModelRuntimeStatus,
   RecentGameSummary,
   ResignGameResponse,
   SubmitMoveResponse,
@@ -150,6 +151,7 @@ export function App() {
   const [mobilePanel, setMobilePanel] = useState<'timeline' | 'status' | 'settings'>('timeline');
   const [runtimeEvents, setRuntimeEvents] = useState<RuntimeTimelineEvent[]>([]);
   const [revealedSegmentCounts, setRevealedSegmentCounts] = useState<Record<string, number>>({});
+  const [modelRuntimeStatus, setModelRuntimeStatus] = useState<ModelRuntimeStatus | null>(null);
 
   const board = useMemo(() => (currentGame ? parseBoard(currentGame.currentFen) : []), [currentGame]);
   const hasOngoingGame = currentGame?.status === 'ONGOING';
@@ -255,6 +257,7 @@ export function App() {
     setPreferences(data.preferences);
     setTheme(data.preferences.theme);
     setRecentGames(data.recentGames);
+    setModelRuntimeStatus(data.modelRuntimeStatus);
   }
 
   async function handleLogin(event: React.FormEvent) {
@@ -275,6 +278,7 @@ export function App() {
       setPreferences(data.preferences);
       setTheme(data.preferences.theme);
       setRecentGames(data.recentGames);
+      setModelRuntimeStatus(data.modelRuntimeStatus);
       await loadCurrentGame(data.token);
       setMessage('登录成功，可以直接新开一局，或继续当前棋局。');
     } catch (loginError) {
@@ -284,6 +288,7 @@ export function App() {
       setRuntimeEvents([]);
       setPreferences(null);
       setRecentGames([]);
+      setModelRuntimeStatus(null);
       setTheme('classic');
       setError(parseApiError(loginError));
     } finally {
@@ -473,6 +478,7 @@ export function App() {
     setRevealedSegmentCounts({});
     setPreferences(null);
     setRecentGames([]);
+    setModelRuntimeStatus(null);
     setTheme('classic');
   }
 
@@ -663,6 +669,7 @@ export function App() {
           <p className="eyebrow">Task Bundle C / 统一演绎时间线</p>
           <h1>你好，{profileName}</h1>
           <p className="lead">当前页面已切到统一时间线：合法回合、非法步、悔棋、将军与终局都进入同一条讨论链路。当前主题会跟随账号偏好恢复。</p>
+          {modelRuntimeStatus?.message ? <p className="inline-notice">{modelRuntimeStatus.message}</p> : null}
         </div>
         <div className="hero-actions">
           {compactLayout ? (
@@ -777,7 +784,7 @@ export function App() {
                 <button
                   key={difficulty.value}
                   type="button"
-                  disabled={actionLoading || hasOngoingGame}
+                  disabled={actionLoading || hasOngoingGame || (modelRuntimeStatus ? !modelRuntimeStatus.hasAnyEnabledModelConfig : false)}
                   onClick={() => void handleCreateGame(difficulty.value)}
                 >
                   {difficulty.label}
@@ -786,6 +793,8 @@ export function App() {
             </div>
             {hasOngoingGame ? (
               <p className="inline-notice">当前已有一局进行中的对局，请先继续当前棋局，或点“认输”结束后再新开。</p>
+            ) : modelRuntimeStatus && !modelRuntimeStatus.hasAnyEnabledModelConfig ? (
+              <p className="inline-notice">当前后台尚未完成可用模型配置，前台已阻止新开对局。请管理员先到 /apps/admin 完成配置并启用至少一个模型。</p>
             ) : (
               <p className="hint">主题切换放在设置区，不占主操作区位置。</p>
             )}

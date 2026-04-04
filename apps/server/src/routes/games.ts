@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { getModelRuntimeStatus } from '../domain/auth/auth-service.js';
 import { requireUser } from '../domain/auth/require-auth.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -22,6 +23,16 @@ export async function gameRoutes(app: FastifyInstance) {
     const parsed = createGameSchema.safeParse(request.body);
     if (!parsed.success) {
       throw new HttpError(400, 'GAME_BAD_REQUEST', '缺少难度参数');
+    }
+
+    const modelRuntimeStatus = await getModelRuntimeStatus(app.prisma);
+    if (!modelRuntimeStatus.hasAnyEnabledModelConfig) {
+      throw new HttpError(
+        503,
+        'MODEL_NOT_CONFIGURED',
+        '当前后台尚未完成可用模型配置，暂时不能新开对局',
+        modelRuntimeStatus.message ?? '请管理员先在后台完成模型配置并启用至少一个模型',
+      );
     }
 
     const result = await app.gameService.createGame(user.id, parsed.data.difficulty);

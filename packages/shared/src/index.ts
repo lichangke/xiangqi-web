@@ -13,6 +13,9 @@ export type GameStatus = (typeof GAME_STATUSES)[number];
 export const THEMES = ['classic', 'ink', 'midnight'] as const;
 export type ThemeKey = (typeof THEMES)[number];
 
+export const MODEL_CONFIG_KEYS = ['decision', 'narrative'] as const;
+export type ModelConfigKey = (typeof MODEL_CONFIG_KEYS)[number];
+
 export const MOVE_TAGS = ['试探', '抢位', '压迫', '解围', '护驾', '换子', '佯动', '追击', '收束'] as const;
 export type MoveTag = (typeof MOVE_TAGS)[number];
 
@@ -74,6 +77,26 @@ export type RecentGameSummary = {
   resultWinner: SideColor | null;
 };
 
+export type AdminModelConfig = {
+  configKey: ModelConfigKey;
+  modelName: string;
+  baseUrl: string;
+  apiKeyMaskedHint: string;
+  thinkingLevel: string;
+  enabled: boolean;
+  isConfigured: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type ModelRuntimeStatus = {
+  hasAnyEnabledModelConfig: boolean;
+  decisionConfigured: boolean;
+  narrativeConfigured: boolean;
+  configuredKeys: ModelConfigKey[];
+  message: string | null;
+};
+
 export type LoginRequest = {
   username: string;
   password: string;
@@ -84,12 +107,14 @@ export type LoginResponse = {
   user: AuthUser;
   preferences: UserPreferences;
   recentGames: RecentGameSummary[];
+  modelRuntimeStatus: ModelRuntimeStatus;
 };
 
 export type GetMeResponse = {
   user: AuthUser;
   preferences: UserPreferences;
   recentGames: RecentGameSummary[];
+  modelRuntimeStatus: ModelRuntimeStatus;
 };
 
 export type UpdatePreferencesRequest = {
@@ -98,6 +123,24 @@ export type UpdatePreferencesRequest = {
 
 export type UpdatePreferencesResponse = {
   preferences: UserPreferences;
+};
+
+export type GetAdminModelConfigsResponse = {
+  configs: AdminModelConfig[];
+  modelRuntimeStatus: ModelRuntimeStatus;
+};
+
+export type UpdateAdminModelConfigRequest = {
+  modelName: string;
+  baseUrl: string;
+  apiKey?: string;
+  thinkingLevel: string;
+  enabled: boolean;
+};
+
+export type UpdateAdminModelConfigResponse = {
+  config: AdminModelConfig;
+  modelRuntimeStatus: ModelRuntimeStatus;
 };
 
 export type CreateGameRequest = {

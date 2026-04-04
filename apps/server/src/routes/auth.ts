@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
+  getModelRuntimeStatus,
   listRecentGames,
   publicUser,
   signToken,
@@ -29,23 +30,31 @@ export async function authRoutes(app: FastifyInstance) {
 
     const user = await validateLogin(app.prisma, parsed.data.username, parsed.data.password);
     const token = signToken({ userId: user.id, username: user.username, role: user.role });
-    const recentGames = await listRecentGames(app.prisma, user.id);
+    const [recentGames, modelRuntimeStatus] = await Promise.all([
+      listRecentGames(app.prisma, user.id),
+      getModelRuntimeStatus(app.prisma),
+    ]);
 
     return reply.send({
       token,
       user: publicUser(user),
       preferences: toUserPreferences(user),
       recentGames,
+      modelRuntimeStatus,
     });
   });
 
   app.get('/api/auth/me', async (request, reply) => {
     const user = await requireUser(request, app.prisma, { includePreferences: true });
-    const recentGames = await listRecentGames(app.prisma, user.id);
+    const [recentGames, modelRuntimeStatus] = await Promise.all([
+      listRecentGames(app.prisma, user.id),
+      getModelRuntimeStatus(app.prisma),
+    ]);
     return reply.send({
       user: publicUser(user),
       preferences: toUserPreferences(user),
       recentGames,
+      modelRuntimeStatus,
     });
   });
 

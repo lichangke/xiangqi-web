@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json && vite build"
   },
   "dependencies": {
+    "@xiangqi-web/shared": "*",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

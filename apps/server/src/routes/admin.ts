@@ -1,6 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import {
+  getModelRuntimeStatus,
+  listAdminModelConfigs,
+  publicUser,
+  upsertAdminModelConfig,
+} from '../domain/auth/auth-service.js';
 import { requireAdmin } from '../domain/auth/require-auth.js';
 import { HttpError } from '../utils/http-error.js';
 
@@ -16,6 +22,18 @@ const resetPasswordSchema = z.object({
 
 const updateStatusSchema = z.object({
   status: z.enum(['ENABLED', 'DISABLED']),
+});
+
+const modelConfigParamsSchema = z.object({
+  configKey: z.enum(['decision', 'narrative']),
+});
+
+const updateModelConfigSchema = z.object({
+  modelName: z.string().min(1),
+  baseUrl: z.string().min(1),
+  apiKey: z.string().optional(),
+  thinkingLevel: z.string().min(1).default('normal'),
+  enabled: z.boolean(),
 });
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -119,5 +137,29 @@ export async function adminRoutes(app: FastifyInstance) {
     });
 
     return reply.send({ success: true });
+  });
+
+  app.get('/api/admin/model-configs', async (request, reply) => {
+    await requireAdmin(request, app.prisma);
+    const [configs, modelRuntimeStatus] = await Promise.all([
+      listAdminModelConfigs(app.prisma),
+      getModelRuntimeStatus(app.prisma),
+    ]);
+
+    return reply.send({ configs, modelRuntimeStatus });
+  });
+
+  app.put('/api/admin/model-configs/:configKey', async (request, reply) => {
+    const admin = await requireAdmin(request, app.prisma);
+    const params = modelConfigParamsSchema.safeParse(request.params);
+    const parsed = updateModelConfigSchema.safeParse(request.body);
+
+    if (!params.success || !parsed.success) {
+      throw new HttpError(400, 'ADMIN_BAD_REQUEST', '模型配置参数不合法');
+    }
+
+    const config = await upsertAdminModelConfig(app.prisma, admin.id, params.data.configKey, parsed.data);
+    const modelRuntimeStatus = await getModelRuntimeStatus(app.prisma);
+    return reply.send({ config, modelRuntimeStatus });
   });
 }
