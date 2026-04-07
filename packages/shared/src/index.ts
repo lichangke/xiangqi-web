@@ -251,6 +251,17 @@ export type NarrativeResponseEnvelope = {
   displayHints?: Record<string, unknown>;
 };
 
+export type ResolveNarrativeRequest = {
+  theme: ThemeKey;
+  envelope: NarrativeRequestEnvelope;
+};
+
+export type ResolveNarrativeResponse = {
+  response: NarrativeResponseEnvelope;
+  source: 'server-fallback' | 'provider';
+  fallbackUsed: boolean;
+};
+
 export type NarrativeTurnPayload = {
   turnNumber: number;
   userMove: RuleMove & {

@@ -22,7 +22,9 @@ import {
   buildFinishEvent,
   buildTimelineItems,
   buildUndoEvent,
+  hydrateRuntimeNarratives,
   normalizeApiError,
+  type NarrativeResolutionState,
   type RuntimeTimelineEvent,
 } from './presentation';
 
@@ -150,12 +152,16 @@ export function App() {
   const [compactLayout, setCompactLayout] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'timeline' | 'status' | 'settings'>('timeline');
   const [runtimeEvents, setRuntimeEvents] = useState<RuntimeTimelineEvent[]>([]);
+  const [narrativeState, setNarrativeState] = useState<NarrativeResolutionState>({});
   const [revealedSegmentCounts, setRevealedSegmentCounts] = useState<Record<string, number>>({});
   const [modelRuntimeStatus, setModelRuntimeStatus] = useState<ModelRuntimeStatus | null>(null);
 
   const board = useMemo(() => (currentGame ? parseBoard(currentGame.currentFen) : []), [currentGame]);
   const hasOngoingGame = currentGame?.status === 'ONGOING';
-  const timelineItems = useMemo(() => buildTimelineItems(currentGame, theme, runtimeEvents), [currentGame, theme, runtimeEvents]);
+  const timelineItems = useMemo(
+    () => buildTimelineItems(currentGame, theme, runtimeEvents, { narrativeState }),
+    [currentGame, theme, runtimeEvents, narrativeState],
+  );
   const latestTimelineItem = timelineItems[0] ?? null;
 
   useEffect(() => {
@@ -211,6 +217,28 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    let disposed = false;
+
+    void hydrateRuntimeNarratives(currentGame, theme, runtimeEvents, narrativeState)
+      .then((resolved) => {
+        if (!disposed) {
+          setNarrativeState((previous) => {
+            const prevJson = JSON.stringify(previous);
+            const nextJson = JSON.stringify(resolved);
+            return prevJson === nextJson ? previous : resolved;
+          });
+        }
+      })
+      .catch(() => {
+        // 保留前端本地 fallback，不打断主链路
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [currentGame, theme, runtimeEvents, narrativeState]);
+
+  useEffect(() => {
     if (!timelineItems.length) {
       setRevealedSegmentCounts({});
       return;
@@ -247,6 +275,7 @@ export function App() {
     setCurrentGame(data.game);
     setSelectedSquare(null);
     setRuntimeEvents([]);
+    setNarrativeState({});
   }
 
   async function loadProfile(nextToken: string) {
@@ -286,6 +315,7 @@ export function App() {
       setProfileName('');
       setCurrentGame(null);
       setRuntimeEvents([]);
+      setNarrativeState({});
       setPreferences(null);
       setRecentGames([]);
       setModelRuntimeStatus(null);
@@ -317,6 +347,7 @@ export function App() {
       setCurrentGame(data.game);
       setSelectedSquare(null);
       setRuntimeEvents([]);
+      setNarrativeState({});
       await loadProfile(token);
       setMessage(`已创建 ${formatDifficulty(difficulty)} 对局，统一时间线会按回合与事件逐段展开。`);
     } catch (createError) {
@@ -475,6 +506,7 @@ export function App() {
     setMessage('');
     setError('');
     setRuntimeEvents([]);
+    setNarrativeState({});
     setRevealedSegmentCounts({});
     setPreferences(null);
     setRecentGames([]);

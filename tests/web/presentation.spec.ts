@@ -9,6 +9,7 @@ import {
   buildUndoEvent,
   resolveTimelineItem,
 } from '../../apps/web/src/presentation.js';
+import { parseNarrativeResponse } from '../../apps/server/src/domain/ai/narrative/narrative-fallback.js';
 
 function createGame(overrides: Partial<GameSummary> = {}): GameSummary {
   return {
@@ -105,6 +106,35 @@ function createGame(overrides: Partial<GameSummary> = {}): GameSummary {
     ...overrides,
   };
 }
+
+describe('server narrative parser compatibility', () => {
+  it('should normalize provider turn payload into NarrativeResponseEnvelope', () => {
+    const parsed = parseNarrativeResponse({
+      itemType: 'turn',
+      title: '中线先试',
+      summary: '红兵进一，黑卒应一步。',
+      segments: [
+        { type: 'narration', text: '红兵先拱中路，黑卒随即顶住。' },
+        { type: 'roleLine', role: '车', text: '先对中线，不急冲。' },
+        { type: 'roleLine', role: '马', text: '都在试步，还没露底。' },
+      ],
+      tags: ['试探铺垫', '中线对位'],
+      grounding: {
+        userMove: { from: 'e3', to: 'e4', pieceType: '兵' },
+        aiMove: { from: 'e7', to: 'e6', pieceType: '卒' },
+      },
+    }, 'turn');
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.schemaVersion).toBe('v1');
+    expect(parsed?.itemType).toBe('turn');
+    expect(parsed?.segments).toHaveLength(4);
+    expect(parsed?.segments[0]?.kind).toBe('review');
+    expect(parsed?.segments[1]?.kind).toBe('voices');
+    expect(parsed?.segments[2]?.kind).toBe('consensus');
+    expect(parsed?.segments[3]?.kind).toBe('decision');
+  });
+});
 
 describe('web presentation helpers', () => {
   it('should expose three immediate theme options', () => {

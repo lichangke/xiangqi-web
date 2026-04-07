@@ -5,10 +5,10 @@
 - 当前状态：已确认
 - 所属阶段：Review
 - 所属项目：xiangqi-web / 网页版中国象棋项目
-- 所属功能 / 子功能：Task Bundle D-2.2 Review / Acceptance（运行策略与审计摘要）
-- 上游文档：spec.md, plan.md, tasks.md, execution-contract.md, docs/Task Bundle D-2.2 实现交接.md
-- 创建时间：2026-04-04
-- 最后更新时间：2026-04-04
+- 所属功能 / 子功能：Task Bundle D-2.3 Review / Acceptance（真实 narrative 模型接入最小闭环）
+- 上游文档：spec.md, plan.md, tasks.md, execution-contract.md, docs/Task Bundle D-2.3 实现交接.md
+- 创建时间：2026-04-07
+- 最后更新时间：2026-04-07
 
 ## 关联更新检查
 本文档形成结论后，至少检查是否需要同步更新：
@@ -21,18 +21,18 @@
 
 ## 1. Review 范围
 ### 本轮覆盖内容
-- Task Bundle D-2.2 的真实代码改动、验证结果与结果回收
-- 管理员读取 / 更新运行策略的最小 API
-- 管理端运行策略前端区块
-- 轻量审计摘要查询 API 与管理端展示
-- 运行策略对主链路现有约束的实际消费校验
-- 共享类型、前后端联动与集成测试补齐
+- Task Bundle D-2.3 的真实代码改动、验证结果与结果回收
+- server 侧 narrative 解析 / 编排入口与 `/api/narrative/resolve` 路由
+- narrative provider 调用、schema 兼容、compact / 短 JSON 兼容与 fallback 闭环
+- 前端 timeline 对 runtime narrative 的接入与本地 fallback 保留
+- narrative 运行时配置读取口径：后台 `narrative` model config + server env 中 `NARRATIVE_API_KEY`
+- route 级 provider 回归测试、前端演绎展示回归测试与全量测试 / 构建回归
 - 当前轮工作树是否已形成稳定快照
 
 ### 对应用户故事 / FR / 任务组
-- 用户故事：US5（本轮按 D-2.2 切片推进）
-- FR：FR-028、FR-029
-- 任务组：任务组 E / Task Bundle D-2.2
+- 用户故事：US3、US5、US6（其中本轮以 D-2.3 增量切片方式承接）
+- FR：FR-018 ~ FR-027
+- 任务组：Task Bundle D-2.3（真实 narrative 模型接入最小闭环）
 
 ---
 
@@ -43,118 +43,140 @@
 - [ ] 不满足
 
 ### 说明
-- 若以 **Task Bundle D-2.2 当前 review 范围** 来看，当前实现已经完成了本轮约定中的主要闭环：管理员已有运行策略读写入口；后台可查看轻量审计摘要；`maxOngoingGamesPerUser` 与 `maxUndoPerGame` 等策略字段已被主链路真实消费，不是只存不读。
-- 但若以 **完整 T52 / 完整后台运维能力** 来看，当前不能写成“全部满足”。最核心的边界是：当前审计仍是轻量摘要层，不是完整观察平台；`maxConcurrentAiGames` 目前已可配置，但尚未在真实外部模型并发执行链路上体现实际限流价值。
-- 因此，本轮正确口径应是：**D-2.2 范围内基本满足，可形成阶段性 review 结论；但不等于完整 T52、完整后台能力或整个 V1 已整体验收完成。**
+- 若以 **Task Bundle D-2.3 当前约定边界** 来看，当前实现已经完成了本轮最核心闭环：
+  1. 后台 `narrative` 模型已配置，且 server env 中存在 `NARRATIVE_API_KEY` 时，可尝试走真实 provider；
+  2. provider 返回 compact / 短 JSON 形态时可被当前 server 侧 parser 正常吸收；
+  3. provider 失败、超时、空响应、schema 非法或前置条件缺失时，会稳定退回 server / 前端既有 fallback，不打断 timeline 与主链路。
+- 但若以 **完整模型配置产品能力** 或 **完整 provider / secret / 连通性平台** 来看，当前不能写成“全部满足”。本轮明确没有完成：
+  - decision 模型外接
+  - 完整 secret 安全持久化体系
+  - 后台直接持久化真实 API Key 并供运行时消费
+  - 完整模型连通性测试平台
+  - narrative / decision 全链路平台化治理
+- 因此，本轮正确口径应是：**D-2.3 边界内基本满足，可形成结构化 review 结论；但不等于完整模型平台、完整 secret 方案或整个 V1 已整体验收完成。**
 
 ---
 
 ## 3. 用户故事完成情况
-### 用户故事 5（P2）
-- 完成情况：在 D-2.2 范围内阶段性完成
+### 用户故事 3（P1）
+- 完成情况：阶段性受益
 - 是否可独立成立：基本成立
-- 说明：当前后台已从“仅有模型配置入口”推进到“可调系统策略 + 可查看关键审计摘要”，因此后台运维面的第二段闭环已成立。
+- 说明：普通回合 narrative 与特殊事件 timeline 的统一展示结构继续成立；本轮新增真实 narrative 接入后，仍保持统一 `NarrativeResponseEnvelope` 与 fallback 语义，没有破坏事件展示主链路。
 
-### 用户故事 1（P1）
-- 完成情况：间接受益
-- 是否可独立成立：不适用
-- 说明：当前通过运行策略中的 `maxOngoingGamesPerUser` 与 `maxUndoPerGame`，对前台主链路已有真实约束作用，但本轮不属于对局体验主范围。
+### 用户故事 5（P2）
+- 完成情况：在 D-2.3 边界内阶段性完成
+- 是否可独立成立：基本成立
+- 说明：D-2.1 / D-2.2 已提供后台模型配置与运行状态基础；本轮继续落实 narrative 模型真实消费口径，使后台 `narrative` 配置不再只是结构占位，而能进入实际 runtime narrative 解析链路。
 
 ### 用户故事 6（P3）
-- 完成情况：局部受益，但未纳入本轮正式验收范围
+- 完成情况：局部受益
 - 是否可独立成立：否
-- 说明：当前后台配置、策略与审计边界比 D-2.1 更清楚，对后续真实模型接入与扩展有帮助；但这不等于 US6 已独立完成。
+- 说明：本轮将 server narrative 入口、provider schema 兼容与 fallback 边界做实，为后续扩展留下更清楚的结构承载位；但这不等于完整扩展架构或完整 AI 平台化能力已经成立。
 
 ---
 
 ## 4. Tasks 完成情况
 ### 已完成任务
-- T52【US5】已完成 D-2.2 切片：
-  - 最小运行策略读写 API
-  - 管理端运行策略页面 / 区块
-  - 轻量审计摘要查询与展示
-  - 运行策略对主链路现有约束的实际消费验证
+- D-2.3 当前切片已完成：
+  - server 侧新增 `NarrativeService` 与 `/api/narrative/resolve` 路由承载位
+  - provider URL 拼接收口，避免 `/v1` 路径被吞
+  - server 入口显式读取仓库根 `.env`，并修复 `config.ts` 过早固化 env 的问题
+  - provider 响应解析兼容 compact / 短 JSON 结构
+  - narrative 运行时最小前置条件闭环：后台 `narrative` model config + env 中 `NARRATIVE_API_KEY`
+  - provider 失败 / 空结果 / schema 非法 / 前置条件缺失时 server fallback 成立
+  - 前端 runtime hydrate narrative 接入，同时保留前端本地 fallback，不打断 timeline
+  - route 级 provider 回归测试补齐
+  - 全量 `npm test` 与 `npm run build` 回归通过
 
 ### 未完成任务
-- T52 中“完整后台观察与运维能力”仍未完全成立：当前仅提供轻量审计摘要，不是完整审计平台
-- `maxConcurrentAiGames` 尚未进入真实外部模型并发执行链路
-- 模型连通性测试未纳入本轮
-- 真实 API Key 持久化与运行期消费方案未纳入本轮
-- T61 未纳入本轮
+- 后台直接持久化真实 API Key 并供 runtime 安全消费的完整方案未纳入本轮
+- decision 模型真实外接未纳入本轮
+- 完整 provider / 并发治理 / 连通性测试平台未纳入本轮
+- 当前工作树尚未提交稳定快照；因此当前只能表达为“review 已形成”，不能表达为“仓库已收稳”
 
 ### 偏差说明
-- 本轮执行遵循 D-2.2 的切片边界，优先把“后台可调系统策略、可看关键操作痕迹”做实，而没有一次性打满完整后台能力。
-- 当前运行策略中，`maxOngoingGamesPerUser` 与 `maxUndoPerGame` 已被主链路真实消费；`maxConcurrentAiGames` 当前更多是结构预留与后台可配置项，尚未在真实外部模型调用链路体现价值。
+- `spec.md` 中 FR-024 / FR-025 的项目级严格口径是：模型运行配置不应以 env-like 配置作为业务配置来源，环境变量仅用于系统级基础配置。
+- 本轮为避免回流扩写到完整 secret 持久化体系，采取了 **最小例外口径**：
+  - `modelName / baseUrl / enabled` 仍继续锚定后台 `narrative` model config；
+  - env 仅承载真实 API Key，不扩写成完整 provider 主配置源。
+- 这一本轮例外已在 D-2.3 执行协议和状态卡中明确限定，因此当前不视为范围跑偏，但必须保留在 review 条件项中，不得误写成项目级长期最终方案。
 
 ---
 
 ## 5. 验证结果概览
 ### 主链路验证
-- 内容：运行策略读写、审计摘要查询、主链路消费当前运行策略、全量测试与构建回归
+- 内容：narrative route provider 接入、compact response shape 解析、前端展示回归、全量测试与构建回归
 - 结果：通过
-- 说明：当前结论基于真实代码、自动化验证与当前工作树复核形成，不是基于口头描述或旧结果沿用。
+- 说明：当前结论基于当前工作树真实执行结果形成，不是沿用旧轮次口头判断。
 
 ### 用户故事独立验证
-- 用户故事 5 → 通过（D-2.2 切片范围内，按最小运维闭环口径）
-- 用户故事 1 → 间接受益（运行策略影响现有主链路约束）
-- 用户故事 6 → 未单独验证（不在本轮正式范围内）
+- narrative provider route 最小闭环 → 通过
+- 前端 timeline / fallback 展示回归 → 通过
+- 后台 runtime model status 可见性 → 通过
+- decision 真实外接 → 未验证（不在本轮范围）
 
 ### 验证明细
-- 定向集成测试 `tests/integration/auth-and-game-api.spec.ts` 通过（17/17）
-- 全量 `npm test` 通过（28/28）
+- `tests/integration/auth-and-game-api.spec.ts` 通过（18/18）
+- `tests/web/presentation.spec.ts` 通过（6/6）
+- `tests/rules/rule-adapter.spec.ts` 通过（6/6）
+- 全量 `npm test` 通过（30/30）
 - `npm run build` 通过
-- 新增集成测试覆盖：
-  - admin 读取 / 更新 runtime policy
-  - admin 查看 lightweight audit summary
-  - runtime policy 放宽后允许同账号创建两局进行中对局
+- 关键新增 / 关键核对点包括：
+  - `/api/narrative/resolve` 在 compact response shape 下可返回 `source=provider`
+  - `fallbackUsed=false`
+  - provider 请求命中 `https://codex.hiyo.top/v1/chat/completions`
+  - provider 最低超时下限已抬到 20000ms
+  - 当前前端 runtime narrative hydrate 失败时仍保留本地 fallback，不打断主链路
 
 ### 验证不足项
-- 当前没有补做一轮真实后台页面人工走查，仅由自动化测试和构建通过支撑
-- 当前没有验证 `maxConcurrentAiGames` 在真实外部模型并发执行链路中的效果，因为该链路尚未接入
-- 当前没有扩写为完整审计平台能力，因为这不在本轮范围内
+- 当前 narrative provider 成功验证主要基于 route 级注入 / mock 与当前工作树本地回归；没有补做一轮真实后台页面人工点击式走查记录
+- 当前没有把 `NARRATIVE_API_KEY` 的后台安全持久化和轮换流程纳入验证，因为这不在本轮范围内
+- 当前没有把 narrative / decision 并发治理与完整连通性平台纳入验证，因为这不在本轮范围内
 
 ### 外部阻塞 / 条件项（如有）
-- 条件项：无新的第三方或 provider 阻塞
-- 是否阻断当前主线验收：不阻断 D-2.2 最小运维闭环结论，但阻断“完整后台观察能力已成立”的结论
-- 若需特别说明：`tests/web/presentation.spec.ts` 中仍会打印既有 fallback 日志，但对应测试已通过，且不构成 D-2.2 阻塞项
+- 条件项 1：当前 narrative runtime 仍依赖 env 中 `NARRATIVE_API_KEY` 作为最小承载位
+- 条件项 2：当前工作树仍存在与 D-2.3 直接相关的未提交改动，尚未形成稳定快照
+- 是否阻断当前主线验收：
+  - 不阻断 D-2.3 “最小闭环已成立”的 review 结论
+  - 但阻断“当前轮次已完全收口并已收稳”的表达
 
 ---
 
 ## 6. 代码质量结构化判断
 ### 正确性
 - 结论：基本通过
-- 说明：运行策略读写、审计摘要查询与主链路消费校验均有真实代码和自动化验证支撑。
+- 说明：route / service / parser / fallback / timeline 之间的链路已在测试与构建下闭环，provider compact 返回形态也已被当前实现兼容。
 
 ### 可读性
 - 结论：通过
-- 说明：shared / server / admin / tests 的边界清晰，当前改动集中在后台策略与审计链路，结构可理解。
+- 说明：server narrative 逻辑集中到 `apps/server/src/domain/ai/narrative/` 与 `/api/narrative/resolve` 路由，职责边界比此前分散在前端本地生成时更清楚。
 
 ### 可维护性
-- 结论：通过
-- 说明：运行策略 DTO、服务逻辑、管理端区块与审计摘要接口已对齐，为后续继续补完整后台观察能力或真实模型接入预留了清晰扩展位。
+- 结论：基本通过
+- 说明：当前结构已形成 server narrative 承载位，并保留前端 fallback；后续若扩展完整 provider 平台或 secret 体系，仍有明确增量落点。
 
 ### 范围控制
 - 结论：通过
-- 说明：当前没有顺手把真实模型接入、真实 secret 持久化或连通性测试一起打满，整体仍收敛在 D-2.2 约定边界内。
+- 说明：当前没有顺手把 decision 模型外接、完整 secret、完整连通性平台一起打满，整体仍收敛在 D-2.3 已确认边界内。
 
 ### 可验证性
 - 结论：通过
-- 说明：本轮 review 结论已基于当前代码快照重新执行定向测试、全量测试与构建，不是只复述前一轮结果。
+- 说明：本轮 review 结论已基于当前工作树重新执行测试与构建，不是只复述上轮状态卡。
 
 ### 可选增强项（按需要填写）
-- 简洁性：通过；本轮只做运行策略与轻量审计摘要，不额外引入后台平台化复杂度
-- 一致性：通过；shared / server / admin / tests 已同步对齐
-- 鲁棒性：基本通过；当前已有最小审计摘要与策略读写，但完整运维能力仍需后续扩展
-- 可扩展性：通过；当前结构已为后续补全真实模型接入与更完整审计能力留下明确落点
-- 性能合理性：通过；本轮主要是后台配置与查询流，不引入额外重链路
+- 简洁性：通过；本轮只补最小 narrative runtime 闭环，不扩写成完整平台
+- 一致性：基本通过；server / web / tests / status 已能对齐到当前 D-2.3 口径
+- 鲁棒性：基本通过；provider 前置条件缺失、空响应、schema 非法和失败时均有 fallback
+- 可扩展性：通过；后续扩展 secret、decision、观测与治理时已有清晰承载位
+- 性能合理性：通过；provider 超时下限与返回解析已做最小收口，未引入明显额外阻塞点
 
 ---
 
 ## 7. 问题与风险
-- 当前通过结论仅覆盖 **Task Bundle D-2.2**，不应外推为完整 T52、完整后台能力或整个 V1 已通过。
-- 当前 `maxConcurrentAiGames` 虽已可配置，但尚未进入真实外部模型并发执行链路，因此不能写成“并发策略已完整生效”。
-- 当前审计能力仍是轻量摘要，不是完整审计平台；若后续需要更强的观察性，仍需继续扩展。
-- 当前工作树对应本轮改动已提交形成稳定快照；当前 review 结论已形成，且仓库级基线已收稳。
+- 当前通过结论只覆盖 **Task Bundle D-2.3（真实 narrative 模型接入最小闭环）**，不应外推为完整模型平台、完整 secret 体系或整个 V1 已通过。
+- 当前 env 承载真实 API Key 只是 D-2.3 的最小落地口径，不应误当成项目长期终态方案。
+- 当前 narrative 真实 provider 最小闭环已成立，但真实后台页面手工联调记录尚未单独沉淀。
+- 当前工作树仍有与 D-2.3 直接相关的未提交改动；因此当前 review 已形成，但仓库快照尚未收稳。
 
 ---
 
@@ -167,33 +189,36 @@
 - [ ] 当前轮次已收口但暂不开启下一轮
 
 ### 结论说明
-- 以 D-2.2 当前约定边界来看，代码、验证与结果回收已经足够支撑 **运行策略最小读写 + 轻量审计摘要** 的 review 结论。
+- 以 D-2.3 当前约定边界来看，代码、验证与结果回收已经足够支撑 **真实 narrative 模型接入最小闭环** 的 review 结论。
 - 当前之所以不是“完全通过”，至少有两条边界必须保留：
-  1. **本结论只覆盖 D-2.2，不覆盖完整 T52 / 真实模型接入 / 完整审计平台 / 连通性测试**
-  2. **当前结论已对应稳定快照，不再存在“review 已形成但仓库未收稳”的状态差**
-- 因此，当前最准确的结论是：**Task Bundle D-2.2 有条件通过 / 阶段性通过；本轮 review 已确认收口，且已形成稳定快照。**
+  1. **本结论只覆盖 D-2.3，不覆盖完整 secret 体系、decision 外接、完整 provider / 连通性平台**
+  2. **当前 review 已形成，但仓库仍未形成稳定快照，因此还不能表达成“当前轮次已完全收稳”**
+- 因此，当前最准确的结论是：**Task Bundle D-2.3 有条件通过 / 阶段性通过；本轮最小 narrative provider 闭环已成立，review 已形成，但仍待稳定快照收稳。**
 
 ---
 
 ## 9. 后续建议
 ### 建议立即处理
-- 若接受当前 D-2.2 只作为“最小运行策略 + 轻量审计摘要”阶段性通过，则应先提交收稳
-- 提交收稳后，再决定下一步是进入 D-2.3（真实模型接入最小闭环），还是先补一轮 D-2.2
+- 若接受当前 D-2.3 作为“真实 narrative 模型接入最小闭环”阶段性通过，则下一步应先提交收稳当前工作树
+- 提交前应顺手检查是否保留 `dev.db` 为本地临时产物，避免把非预期本地数据文件混入稳定快照
+- 收稳后，再决定下一步是：
+  - 开启下一轮增量（如 decision 外接或完整 secret 方案）
+  - 还是先补一轮 D-2.3 的真实页面人工联调记录
 
 ### 可放入下一轮迭代
-- 真实 API Key 安全持久化与运行期读取方案
-- 真实外部模型接入
-- 模型连通性测试
-- 更完整的审计观察能力
-- `maxConcurrentAiGames` 对真实外部模型并发执行链路的实际约束
+- 真实 API Key 的安全持久化与运行期读取方案
+- decision 模型真实外接
+- narrative / decision 并发治理
+- 完整模型连通性测试平台
+- 更完整的 provider 观测与审计能力
 
 ---
 
 ## 10. 最终验收意见
 ### 用户验收意见
-- 用户是否接受当前结论：当前已要求继续回写 D-2.2 review 并同步状态卡；当前按接受 review 结论形成处理
-- 用户是否接受条件项不阻断当前主线验收：当前按“阶段性通过，但保留边界”处理
-- 其他验收备注：当前“有条件通过”仅指结论范围局限于 D-2.2，而不是仓库快照未形成
+- 用户是否接受当前结论：当前已要求将 D-2.3 的 `review.md` 与 `sdd-status.md` 一起回写收口
+- 用户是否接受条件项不阻断当前主线验收：当前按“阶段性通过，但保留边界与稳定快照待收稳”处理
+- 其他验收备注：当前“有条件通过”主要指范围边界和仓库快照状态，而不是最小 narrative provider 闭环未成立
 
 ### 是否验收通过
 - [ ] 是

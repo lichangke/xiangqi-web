@@ -33,6 +33,7 @@ tmp/
 # Local database artifacts
 apps/server/prisma/dev.db
 apps/server/prisma/*.db-journal
+dev.db
 
 # Logs
 *.log

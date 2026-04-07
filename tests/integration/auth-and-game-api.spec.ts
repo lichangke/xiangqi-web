@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { buildApp } from '../../apps/server/src/app.js';
@@ -347,6 +347,152 @@ describe('auth and game APIs', () => {
     }
   });
 
+
+  it('should resolve narrative route from provider with compact response shape', async () => {
+    const previousNarrativeKey = process.env.NARRATIVE_API_KEY;
+    process.env.NARRATIVE_API_KEY = 'sk-test-narrative-key';
+
+    await prisma.modelConfig.create({
+      data: {
+        configKey: 'narrative',
+        modelName: 'gpt-5.4',
+        baseUrl: 'https://codex.hiyo.top/v1',
+        apiKeyMaskedHint: 'sk-t***key',
+        thinkingLevel: 'normal',
+        enabled: true,
+      },
+    });
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes('/v1/chat/completions')) {
+        return new Response(JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  itemType: 'turn',
+                  title: '中线先试一手',
+                  summary: '兵卒对提，中线节拍被同时抬起，局面仍在试探，尚未转成实压。',
+                  review: '红兵进一，黑卒亦进一，中线形成对位，双方都在试探。',
+                  voices: '车：先占节拍。马：都没露急手。炮：中路先亮了。',
+                  consensus: '这一回合没有交换与将压，只是把中路起势摆明。',
+                  decision: '试探已落子，接下来就看谁先把中线节拍转成实压。',
+                  tone: 'calm',
+                  highlightLevel: 'medium',
+                  displayHints: { theme: 'classic', preferredLayout: 'compact' },
+                }),
+              },
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }
+
+      return originalFetch(input as any, init);
+    });
+
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/narrative/resolve',
+        headers: {
+          'content-type': 'application/json',
+        },
+        payload: {
+          theme: 'classic',
+          envelope: {
+            schemaVersion: 'v1',
+            requestId: 'test-narrative-route-001',
+            gameContext: {
+              gameId: 'game-1',
+              turnNumber: 1,
+              userSide: 'red',
+              aiSide: 'black',
+              difficulty: 'NORMAL',
+              gameStatus: 'ONGOING',
+              isCheck: false,
+              isGameEnding: false,
+              storyThreadSummary: {
+                currentPhase: '对压期',
+                mainConflict: '双方都在争谁能先把试探落成实压，黑方当前更占话语权。',
+                pressureSide: 'BLACK',
+                recentFocus: '中路压力',
+                carryForward: '下一回合继续强调红方先解压，再谈反抢。',
+              },
+            },
+            themeContext: {
+              storyThemeId: 'border-council-night',
+              storyThemeName: '边关夜议',
+              themeTone: '稳中见锋',
+              doNotUseStyles: ['长篇抒情', '过度比喻', '强表演台词'],
+            },
+            roleContext: {
+              activeRoles: ['车', '马', '炮'],
+              roleCardsVersion: 'v1',
+              roleHints: ['车：发言要短，要贴住当前局势。', '马：发言要短，要贴住当前局势。', '炮：发言要短，要贴住当前局势。'],
+            },
+            itemType: 'turn',
+            itemPayload: {
+              turnNumber: 1,
+              userMove: { from: 'e3', to: 'e4', pieceType: '兵', semanticTag: '试探' },
+              aiMove: { from: 'e7', to: 'e6', pieceType: '卒', semanticTag: '试探' },
+              capture: false,
+              checkState: { before: false, after: false },
+              situationShift: '双方先把中路节拍抬起来。',
+              turnArc: '试探铺垫',
+              highlightReason: ['中线对位'],
+              storyThreadSummary: {
+                currentPhase: '对压期',
+                mainConflict: '双方都在争谁能先把试探落成实压，黑方当前更占话语权。',
+                pressureSide: 'BLACK',
+                recentFocus: '中路压力',
+                carryForward: '下一回合继续强调红方先解压，再谈反抢。',
+              },
+              narrativeGoal: '解释这一回合在剧情上的推进意义，并保持角色发言克制短促。',
+            },
+            constraints: {
+              maxChars: 180,
+              segmentCount: 4,
+              language: 'zh-CN',
+              mustStayGroundedInFacts: true,
+              allowWorldExpansion: false,
+              mustReturnJson: true,
+            },
+            fallbackPolicy: {
+              fallbackMode: 'template-minimal',
+              timeoutMs: 15000,
+              onSchemaInvalid: 'fallback',
+              onEmptyResponse: 'fallback',
+            },
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().source).toBe('provider');
+      expect(response.json().fallbackUsed).toBe(false);
+      expect(response.json().response.segments.map((segment: { kind: string }) => segment.kind)).toEqual(['review', 'voices', 'consensus', 'decision']);
+      expect(fetchMock).toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (previousNarrativeKey === undefined) {
+        delete process.env.NARRATIVE_API_KEY;
+      } else {
+        process.env.NARRATIVE_API_KEY = previousNarrativeKey;
+      }
+    }
+  });
 
   it('should expose runtime model status in auth payloads', async () => {
     const response = await app.inject({

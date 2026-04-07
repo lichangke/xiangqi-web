@@ -12,6 +12,9 @@ import {
   type NarrativeResponseSegment,
   type NarrativeSegmentKind,
   type NarrativeTone,
+  type NarrativeTurnPayload,
+  type ResolveNarrativeRequest,
+  type ResolveNarrativeResponse,
   type SpecialEventType,
   type ThemeKey,
   type TurnArc,
@@ -111,6 +114,8 @@ export type RuntimeTimelineEvent = {
   envelope: NarrativeRequestEnvelope;
 };
 
+export type NarrativeResolutionState = Record<string, ResolveNarrativeResponse | undefined>;
+
 export type TimelineSegment = {
   id: string;
   kind: NarrativeSegmentKind;
@@ -137,6 +142,8 @@ export type TimelineItem = {
 };
 
 type NarrativeGenerator = (envelope: NarrativeRequestEnvelope, theme: ThemeKey) => NarrativeResponseEnvelope;
+
+type AsyncNarrativeResolver = (envelope: NarrativeRequestEnvelope, theme: ThemeKey) => Promise<ResolveNarrativeResponse>;
 
 type ComposeOptions = {
   generator?: NarrativeGenerator;
@@ -813,32 +820,38 @@ export function resolveTimelineItem(
   envelope: NarrativeRequestEnvelope,
   theme: ThemeKey,
   options: ComposeOptions = {},
+  preResolved?: { response: NarrativeResponseEnvelope; fallbackUsed?: boolean },
 ): TimelineItem {
   const generator = options.generator ?? generateNarrative;
 
   let response: NarrativeResponseEnvelope;
   let fallbackUsed = false;
-  try {
-    const candidate = generator(envelope, theme);
-    if (!isNarrativeResponseEnvelope(candidate, envelope.itemType)) {
+  if (preResolved) {
+    response = preResolved.response;
+    fallbackUsed = Boolean(preResolved.fallbackUsed);
+  } else {
+    try {
+      const candidate = generator(envelope, theme);
+      if (!isNarrativeResponseEnvelope(candidate, envelope.itemType)) {
+        fallbackUsed = true;
+        logNarrativeFailure({
+          failureReason: 'schema_invalid',
+          turnType: envelope.itemType,
+          eventType: envelope.itemType === 'event' ? (envelope.itemPayload as NarrativeEventPayload).eventType : 'none',
+        });
+        response = buildFallbackResponse(envelope);
+      } else {
+        response = candidate;
+      }
+    } catch (error) {
       fallbackUsed = true;
       logNarrativeFailure({
-        failureReason: 'schema_invalid',
+        failureReason: error instanceof Error ? error.message : 'generator_failed',
         turnType: envelope.itemType,
         eventType: envelope.itemType === 'event' ? (envelope.itemPayload as NarrativeEventPayload).eventType : 'none',
       });
       response = buildFallbackResponse(envelope);
-    } else {
-      response = candidate;
     }
-  } catch (error) {
-    fallbackUsed = true;
-    logNarrativeFailure({
-      failureReason: error instanceof Error ? error.message : 'generator_failed',
-      turnType: envelope.itemType,
-      eventType: envelope.itemType === 'event' ? (envelope.itemPayload as NarrativeEventPayload).eventType : 'none',
-    });
-    response = buildFallbackResponse(envelope);
   }
 
   return {
@@ -869,15 +882,38 @@ export function buildTimelineItems(
   game: GameSummary | null,
   theme: ThemeKey,
   runtimeEvents: RuntimeTimelineEvent[] = [],
-  options: ComposeOptions = {},
+  options: ComposeOptions & { narrativeState?: NarrativeResolutionState } = {},
 ): TimelineItem[] {
+  const narrativeState = options.narrativeState ?? {};
   const turnItems = !game?.moves.length
     ? []
     : [...new Map(game.moves.map((move) => [move.turnNumber, game.moves.filter((candidate) => candidate.turnNumber === move.turnNumber)])).entries()]
       .sort(([left], [right]) => left - right)
-      .map(([turnNumber, moves]) => resolveTimelineItem(`turn-${turnNumber}`, turnNumber * 2, buildTurnEnvelope(game, turnNumber, moves, theme), theme, options));
+      .map(([turnNumber, moves]) => {
+        const id = `turn-${turnNumber}`;
+        const envelope = buildTurnEnvelope(game, turnNumber, moves, theme);
+        const runtimeMatch = narrativeState[id];
+        return resolveTimelineItem(
+          id,
+          turnNumber * 2,
+          envelope,
+          theme,
+          options,
+          runtimeMatch?.response ? { response: runtimeMatch.response, fallbackUsed: runtimeMatch.fallbackUsed } : undefined,
+        );
+      });
 
-  const eventItems = runtimeEvents.map((event) => resolveTimelineItem(event.id, event.order, event.envelope, theme, options));
+  const eventItems = runtimeEvents.map((event) => {
+    const runtimeMatch = narrativeState[event.id];
+    return resolveTimelineItem(
+      event.id,
+      event.order,
+      event.envelope,
+      theme,
+      options,
+      runtimeMatch?.response ? { response: runtimeMatch.response, fallbackUsed: runtimeMatch.fallbackUsed } : undefined,
+    );
+  });
   return [...turnItems, ...eventItems].sort((left, right) => right.order - left.order);
 }
 
@@ -951,6 +987,72 @@ function currentTurnNumber(game: GameSummary | null) {
   }
 
   return Math.floor(game.moves.length / 2) + 1;
+}
+
+export async function resolveNarrativeViaServer(
+  envelope: NarrativeRequestEnvelope,
+  theme: ThemeKey,
+): Promise<ResolveNarrativeResponse> {
+  const payload: ResolveNarrativeRequest = { theme, envelope };
+  const response = await fetch('/api/narrative/resolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw result;
+  }
+
+  return result as ResolveNarrativeResponse;
+}
+
+export async function hydrateRuntimeNarratives(
+  game: GameSummary | null,
+  theme: ThemeKey,
+  runtimeEvents: RuntimeTimelineEvent[],
+  previousState: NarrativeResolutionState = {},
+  resolver: AsyncNarrativeResolver = resolveNarrativeViaServer,
+): Promise<NarrativeResolutionState> {
+  const turnEvents = !game?.moves.length
+    ? []
+    : [...new Map(game.moves.map((move) => [move.turnNumber, game.moves.filter((candidate) => candidate.turnNumber === move.turnNumber)])).entries()]
+      .sort(([left], [right]) => left - right)
+      .map(([turnNumber, moves]) => ({
+        id: `turn-${turnNumber}`,
+        order: turnNumber * 2,
+        envelope: buildTurnEnvelope(game, turnNumber, moves, theme),
+      } satisfies RuntimeTimelineEvent));
+
+  const merged = [...turnEvents, ...runtimeEvents];
+  const activeIds = new Set(merged.map((item) => item.id));
+  const nextState: NarrativeResolutionState = Object.fromEntries(
+    Object.entries(previousState).filter(([id]) => activeIds.has(id)),
+  );
+
+  const unresolved = merged.filter((item) => !nextState[item.id]);
+  if (!unresolved.length) {
+    return nextState;
+  }
+
+  const resolvedEntries = await Promise.all(unresolved.map(async (item) => {
+    try {
+      return [item.id, await resolver(item.envelope, theme)] as const;
+    } catch {
+      return null;
+    }
+  }));
+
+  for (const entry of resolvedEntries) {
+    if (!entry) {
+      continue;
+    }
+    const [id, resolved] = entry;
+    nextState[id] = resolved;
+  }
+
+  return nextState;
 }
 
 export function buildErrorEvent(game: GameSummary | null, theme: ThemeKey, error: ApiErrorInfo, attemptedMove: string | undefined, order: number): RuntimeTimelineEvent {
