@@ -494,6 +494,173 @@ describe('auth and game APIs', () => {
     }
   });
 
+  it('should parse SSE chat completion chunks and return provider narrative', async () => {
+    const previousNarrativeKey = process.env.NARRATIVE_API_KEY;
+    process.env.NARRATIVE_API_KEY = 'sk-live-test-sse';
+
+    await prisma.modelConfig.upsert({
+      where: { configKey: 'narrative' },
+      update: {
+        modelName: 'gpt-5.4',
+        baseUrl: 'https://api.example.com/v1',
+        apiKeyMaskedHint: 'sk-l***sse',
+        enabled: true,
+      },
+      create: {
+        configKey: 'narrative',
+        modelName: 'gpt-5.4',
+        baseUrl: 'https://api.example.com/v1',
+        apiKeyMaskedHint: 'sk-l***sse',
+        thinkingLevel: 'high',
+        enabled: true,
+      },
+    });
+
+    const originalFetch = globalThis.fetch;
+    const sseEvents = [
+      {
+        id: 'resp_sse_1',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-5.4',
+        choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }],
+      },
+      {
+        id: 'resp_sse_1',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-5.4',
+        choices: [{
+          index: 0,
+          delta: {
+            content: JSON.stringify({
+              schemaVersion: 'v1',
+              itemType: 'turn',
+              title: '第 1 回合',
+              summary: '双方先把中路节拍抬起来。',
+              tone: 'calm',
+              highlightLevel: 'medium',
+              segments: [
+                { kind: 'review', label: '简评', text: '双方先把中路节拍抬起来。' },
+                { kind: 'voices', label: '发言', text: '车：先把这条线看稳。' },
+                { kind: 'consensus', label: '共识', text: '当前共识：先稳住中路。' },
+                { kind: 'decision', label: '落子', text: '兵 e3→e4；卒 e7→e6。' },
+              ],
+              displayHints: {},
+            }),
+          },
+          finish_reason: null,
+        }],
+      },
+      {
+        id: 'resp_sse_1',
+        object: 'chat.completion.chunk',
+        created: 1,
+        model: 'gpt-5.4',
+        choices: [{ index: 0, delta: { content: '' }, finish_reason: 'stop' }],
+      },
+    ];
+
+    const sseBody = `${sseEvents.map((event) => `data: ${JSON.stringify(event)}`).join('\n\n')}\n\ndata: [DONE]\n\n`;
+
+    globalThis.fetch = vi.fn(async () => new Response(sseBody, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+    })) as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/narrative/resolve',
+        headers: {
+          'content-type': 'application/json',
+        },
+        payload: {
+          theme: 'classic',
+          envelope: {
+            schemaVersion: 'v1',
+            requestId: 'test-narrative-sse-001',
+            gameContext: {
+              gameId: 'game-1',
+              turnNumber: 1,
+              userSide: 'red',
+              aiSide: 'black',
+              difficulty: 'NORMAL',
+              gameStatus: 'ONGOING',
+              isCheck: false,
+              isGameEnding: false,
+              storyThreadSummary: {
+                currentPhase: '对压期',
+                mainConflict: '双方都在争谁能先把试探落成实压。',
+                pressureSide: 'BALANCED',
+                recentFocus: '中路压力',
+                carryForward: '下一回合继续强调红方先解压。',
+              },
+            },
+            themeContext: {
+              storyThemeId: 'border-council-night',
+              storyThemeName: '边关夜议',
+              themeTone: '稳中见锋',
+              doNotUseStyles: ['长篇抒情'],
+            },
+            roleContext: {
+              activeRoles: ['车', '马', '炮'],
+              roleCardsVersion: 'v1',
+              roleHints: ['车：发言要短。'],
+            },
+            itemType: 'turn',
+            itemPayload: {
+              turnNumber: 1,
+              userMove: { from: 'e3', to: 'e4', pieceType: '兵', semanticTag: '试探' },
+              aiMove: { from: 'e7', to: 'e6', pieceType: '卒', semanticTag: '试探' },
+              capture: false,
+              checkState: { before: false, after: false },
+              situationShift: '双方先把中路节拍抬起来。',
+              turnArc: '试探铺垫',
+              highlightReason: ['中线对位'],
+              storyThreadSummary: {
+                currentPhase: '对压期',
+                mainConflict: '双方都在争谁能先把试探落成实压。',
+                pressureSide: 'BALANCED',
+                recentFocus: '中路压力',
+                carryForward: '下一回合继续强调红方先解压。',
+              },
+              narrativeGoal: '解释这一回合在剧情上的推进意义。',
+            },
+            constraints: {
+              maxChars: 180,
+              segmentCount: 4,
+              language: 'zh-CN',
+              mustStayGroundedInFacts: true,
+              allowWorldExpansion: false,
+              mustReturnJson: true,
+            },
+            fallbackPolicy: {
+              fallbackMode: 'template-minimal',
+              timeoutMs: 15000,
+              onSchemaInvalid: 'fallback',
+              onEmptyResponse: 'fallback',
+            },
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().source).toBe('provider');
+      expect(response.json().fallbackUsed).toBe(false);
+      expect(response.json().response.summary).toContain('双方先把中路节拍抬起来');
+      expect(response.json().response.segments.map((segment: { kind: string }) => segment.kind)).toEqual(['review', 'voices', 'consensus', 'decision']);
+      expect(globalThis.fetch).toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (previousNarrativeKey === undefined) {
+        delete process.env.NARRATIVE_API_KEY;
+      } else {
+        process.env.NARRATIVE_API_KEY = previousNarrativeKey;
+      }
+    }
+  });
+
   it('should expose runtime model status in auth payloads', async () => {
     const response = await app.inject({
       method: 'GET',

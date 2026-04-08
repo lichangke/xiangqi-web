@@ -18,6 +18,10 @@ type NarrativeFailurePayload = {
   providerTimeoutMs?: number;
 };
 
+type ChatCompletionJsonPayload = {
+  choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
+};
+
 function logNarrativeFailure(payload: NarrativeFailurePayload) {
   console.warn('[bundle-d23-narrative-server-fallback]', payload);
 }
@@ -62,6 +66,67 @@ function normalizeProviderContent(rawContent: unknown) {
   return '';
 }
 
+async function readProviderText(response: Response) {
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+
+  if (contentType.includes('text/event-stream')) {
+    const raw = await response.text();
+    const lines = raw.split(/\r?\n/);
+    let text = '';
+    let hasChoices = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) {
+        continue;
+      }
+
+      const data = trimmed.slice(5).trim();
+      if (!data || data === '[DONE]') {
+        continue;
+      }
+
+      try {
+        const chunk = JSON.parse(data) as {
+          choices?: Array<{
+            delta?: { content?: string | Array<{ type?: string; text?: string }> };
+            message?: { content?: string | Array<{ type?: string; text?: string }> };
+          }>;
+        };
+
+        if (Array.isArray(chunk.choices) && chunk.choices.length > 0) {
+          hasChoices = true;
+        }
+
+        const deltaContent = chunk.choices?.[0]?.delta?.content;
+        const messageContent = chunk.choices?.[0]?.message?.content;
+        const part = normalizeProviderContent(deltaContent ?? messageContent);
+        if (part) {
+          text += part;
+        }
+      } catch {
+        // ignore malformed chunks; fallback path will handle empty text if nothing useful was parsed
+      }
+    }
+
+    return {
+      text,
+      hasChoices,
+      rawContentType: 'sse',
+    };
+  }
+
+  const payload = await response.json() as ChatCompletionJsonPayload;
+  const hasChoices = Array.isArray(payload.choices) && payload.choices.length > 0;
+  const rawContent = payload.choices?.[0]?.message?.content;
+
+  return {
+    text: normalizeProviderContent(rawContent),
+    hasChoices,
+    rawContentType: getRawContentType(rawContent),
+  };
+}
+
 export class NarrativeService {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -99,6 +164,7 @@ export class NarrativeService {
         body: JSON.stringify({
           model: modelConfig.modelName,
           temperature: 0.4,
+          stream: true,
           response_format: { type: 'json_object' },
           messages: [
             {
@@ -128,21 +194,24 @@ export class NarrativeService {
         throw new Error(`provider_http_${response.status}`);
       }
 
-      const payload = await response.json() as {
-        choices?: Array<{ message?: { content?: string | Array<{ type?: string; text?: string }> } }>;
-      };
-
-      hasChoices = Array.isArray(payload.choices) && payload.choices.length > 0;
-      const rawContent = payload.choices?.[0]?.message?.content;
-      rawContentType = getRawContentType(rawContent);
-      const text = normalizeProviderContent(rawContent);
+      const providerText = await readProviderText(response);
+      hasChoices = providerText.hasChoices;
+      rawContentType = providerText.rawContentType;
+      const text = providerText.text;
       contentLength = text.length;
 
       if (!text.trim()) {
         throw new Error('provider_empty_response');
       }
 
-      const parsed = parseNarrativeResponse(JSON.parse(text), envelope.itemType);
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(text);
+      } catch (error) {
+        throw new Error(`provider_json_invalid:${error instanceof Error ? error.message : 'unknown'}`);
+      }
+
+      const parsed = parseNarrativeResponse(parsedJson, envelope.itemType);
       if (!parsed) {
         throw new Error('provider_schema_invalid');
       }
@@ -155,6 +224,7 @@ export class NarrativeService {
         providerTimeoutMs,
         modelName: modelConfig.modelName,
         baseUrl: modelConfig.baseUrl,
+        rawContentType,
       });
 
       return {

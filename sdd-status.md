@@ -8,11 +8,11 @@
 - 所属功能 / 子功能：Review / Task Bundle D-2.3（真实 narrative 模型接入最小闭环）
 - 上游文档：docs/需求分析结论.md
 - 创建时间：2026-03-26
-- 最后更新时间：2026-04-07
+- 最后更新时间：2026-04-08
 
 ## 1. 当前阶段
 - 当前阶段：Review（Task Bundle D-2.3 review 已形成并已完成远端同步）
-- 当前阶段状态：Task Bundle D-2.3 已完成实现结果回收、review 回写、本地稳定快照提交与远端同步。当前结论是：**真实 narrative 模型接入最小闭环已成立，`/api/narrative/resolve` route 场景可命中 provider，compact / 短 JSON 形态可被当前 parser 正常兼容，provider 失败或前置条件缺失时 fallback 仍可稳定托底。当前 `review.md` 与 `sdd-status.md` 已同步切换到 D-2.3 review 结论状态，本地稳定快照已形成并已推送远端（最新远端提交 `cb4e092`，包含 `bd00d8b`《收稳 D-2.3 narrative 真实接入最小闭环与 review 回写》与 `cb4e092`《修正 D-2.3 稳定快照与远端同步状态口径》）；当前这一轮已完成本地与远端双侧收口。**
+- 当前阶段状态：Task Bundle D-2.3 已完成实现结果回收、review 回写、本地稳定快照提交与远端同步。当前结论是：**真实 narrative 模型接入最小闭环已成立，`/api/narrative/resolve` route 场景可命中 provider，compact / 短 JSON / SSE chat completion chunk 形态可被当前 parser 正常兼容，provider 失败或前置条件缺失时 fallback 仍可稳定托底。当前 `review.md` 与 `sdd-status.md` 已同步切换到 D-2.3 review 结论状态；虽然远端 `origin/main` 仍停在 `68f024b`，但当前工作树已补齐 SSE 解析回归、客户端补充联调记录与最新 review / status 回写，已重新形成待提交稳定快照；下一步应直接以这批更新形成新的远端收口快照。**
 
 ## 2. 各核心文档状态
 ### spec.md
@@ -43,47 +43,45 @@
 ### review.md
 - 状态：已创建（已确认）
 - 是否已确认：是
-- 备注：当前已切换为 Task Bundle D-2.3 的结构化 review 结论；结论为“有条件通过 / 阶段性通过，远端同步已完成”
+- 备注：当前已切换为 Task Bundle D-2.3 的结构化 review 结论；结论为“有条件通过 / 阶段性通过”，并已补记 2026-04-08 客户端体验反馈与 SSE 解析回归口径
 
 ## 3. 当前中断点
 ### 上次停在什么位置
-主会话已完成 D-2.3 的实现、验证、review 回写、本地稳定快照提交与远端 push；当前已不再停在“是否进入 review”“是否收稳当前工作树”或“远端是否同步成功”的判断，而是停在 **这一轮已正式收口后是否开启下一轮** 的动作点。
+主会话此前已完成 D-2.3 的最小闭环实现、验证、review 回写与一轮本地稳定快照；但最新客户端补测又把焦点推进到 **对局 AI 智能不足 / 演绎 AI 对话质量不满意**，同时当前工作树还新增了 SSE 解析回归测试、Vite host 调整与客户端补充联调记录，说明本轮现实停点已从“是否收口 D-2.3”变成 **先把当前新状态落盘、形成新的稳定快照，再开启下一轮专项问题切片**。
 
 ### 为什么停下
-当前 narrative provider 最小闭环、route 级测试、前端展示回归与全量测试 / 构建都已完成，本地稳定快照也已提交形成 `bd00d8b`，随后又补入文档口径修正提交 `cb4e092`，并已成功推送到远端 `origin/main`。当前剩余差异不再是本轮收口，而是后续是否开启新切片的问题。
+当前 narrative provider 最小闭环、route 级测试、SSE 解析回归、前端展示回归与全量测试 / 构建都已完成；但客户端真实页面补测又明确暴露：**对局 AI 智能感** 与 **演绎 AI 对话质感** 仍未达到满意，且当前工作树尚未把这些最新事实收成远端稳定快照。因此当前暂停点不是旧的 D-2.3 是否成立，而是：
+1. 先把这轮新增代码 / 文档 / 验证结果 commit and push
+2. 再以新问题切片开启下一轮专项处理
 
 ### 恢复时应先处理什么
-恢复时不要再回退讨论“D-2.3 是否已形成 review”“provider 是否能接通”“是否已形成本地稳定快照”或“远端是否已同步”；应直接从 **下一轮判断** 继续：
-1. 若要继续推进，先判断下一轮是补 D-2.3 真实页面联调记录，还是开启新切片
-2. 若暂不继续，当前轮可视为已正式收口完成
+恢复时不要再回退讨论“D-2.3 是否已形成 review”“provider 是否能接通”这类旧问题；应直接从以下顺序继续：
+1. 先确认当前这批 SSE 解析回归、Vite host 调整、客户端补充联调记录与 review / status 回写已形成新的稳定快照并完成远端同步
+2. 再开启新一轮专项判断：把“对局 AI 智能不足”和“演绎 AI 对话不满意”拆开，分别核对输入、prompt、页面命中 provider 质量与 fallback 污染
+3. 不要把最新客户端体验问题简单归因成“只改提示词”或“D-2.3 根本没接上”
 
 ## 4. 下一步唯一推荐动作
-从 D-2.3 Review 切到 **下一轮判断**：
-1. 判断是否需要补一轮 D-2.3 的真实页面人工联调记录
-2. 若不补当前轮细化记录，则开始判断下一轮切片（如 decision 外接或完整 secret 方案）
-3. 不要再重复回做 D-2.3 的收稳与远端同步动作
+先把当前工作树新增内容（SSE 解析回归、客户端补充联调记录、review / status 最新口径、必要配置改动）收成新的稳定快照并推送远端；随后新起一轮，专项处理：
+1. 对局 AI 是否因为输入不足 / fallback / 未稳定命中 provider 导致“智能感不够”
+2. 演绎 AI 是否因为 prompt / schema / 上下文拼装导致“对话不满意”
 
 ## 5. 当前阻塞 / 未决问题
-- 当前无新的用户侧未决项
+- 当前无新的“D-2.3 是否成立”级别阻塞；route 级 narrative provider 最小闭环仍成立
 - 当前已确认 D-2.3 范围收敛在：
   - narrative 真实模型接入最小闭环
   - fallback narrative 保留
   - timeline 契约不变
   - server env 仅作为真实 API Key 的最小承载位，不扩写成完整 provider 主配置体系
-- 当前明确未进入：
-  - decision 模型外接
-  - 完整 secret 安全体系
-  - 完整模型连通性测试平台
-  - 更完整 provider / 并发治理平台
 - 当前真实 narrative 接入主阻塞已解除：
   - 正确 provider 口径已确定为 `https://codex.hiyo.top/v1` + `gpt-5.4`
   - 根 `.env` 已可被 server 入口正确读取
   - `config.ts` 已改为运行时读取 env
   - route 场景已可返回 `source=provider`
   - 已补 route 级 provider 回归测试锁定 compact response shape
-- 当前剩余问题不再是“能否接通 provider”“是否已形成稳定快照”或“远端是否已同步”，而是：
-  - 当前 env 承载 API Key 只是 D-2.3 的最小口径，不是项目最终 secret 方案
-  - 真实后台页面手工联调记录尚未单独沉淀（如后续认为有必要，可作为下一轮补记）
+  - 已补 SSE chat completion chunk 解析回归，说明当前 provider 若以流式 chunk 形式返回也可被当前 route 吸收
+- 当前真正未决的是下一轮体验问题：
+  - 对局 AI 是否真的稳定命中大模型，以及输入是否足够支撑“智能感”
+  - 演绎 AI 的 prompt / schema / 上下文拼装是否导致输出模板味重、棋局锚点弱、像轮流解说
 
 ## 6. 最近执行痕迹摘要
 - [2026-04-04] 主会话完成 D-2.2 review 收口并形成稳定快照，提交 `68f024b`
@@ -107,11 +105,14 @@
 - [2026-04-07] 主会话已同步将 `sdd-status.md` 回写到 D-2.3 review 结论状态
 - [2026-04-07] 主会话已提交本地稳定快照 `bd00d8b`《收稳 D-2.3 narrative 真实接入最小闭环与 review 回写》
 - [2026-04-07] 主会话已提交文档口径修正 `cb4e092`《修正 D-2.3 稳定快照与远端同步状态口径》
-- [2026-04-07] 主会话已成功将 `68f024b..cb4e092` 推送到 `origin/main`
+- [2026-04-08] 主会话已补 SSE chat completion chunk 解析逻辑，并新增 route 级回归测试锁定 `text/event-stream` 返回下仍可返回 provider narrative
+- [2026-04-08] 主会话已再次执行当前工作树验证：`npm test` 通过（31/31）、`npm run build` 通过
+- [2026-04-08] 用户在客户端真实页面补测中反馈：对局 AI 大模型智能与演绎 AI 对话均不满意，疑似进入了新的 prompt / 输入契约 / 页面命中质量问题域
+- [2026-04-08] 主会话已新增 `docs/Task Bundle D-2.3 真实页面人工联调记录.md`，并将 `review.md` / `sdd-status.md` 回写到“准备形成新稳定快照后转入下一轮专项处理”的口径
 
 ## 7. 当前执行范围（Implement / Review 阶段重点填写）
 ### 当前正在执行
-- D-2.3 当前轮已完成本地与远端双侧收口；当前仅待判断是否开启下一轮
+- 回写 D-2.3 最新客户端补测状态，并准备把当前工作树重新收成新的稳定快照后推送远端
 
 ### 当前已完成
 - 项目启动与需求讨论的第一轮收口
@@ -139,27 +140,30 @@
 - 当前轮无必须未完成项
 
 ### 当前验证情况
-- D-2.3 当前实现已完成一轮自动化验证：`npm test` 通过（30/30）、`npm run build` 通过
+- D-2.3 当前实现已完成一轮自动化验证：`npm test` 通过（31/31）、`npm run build` 通过
 - D-2.3 已完成 route 级 provider 回归验证：
   - `/api/narrative/resolve` 在 compact response shape 下可返回 `source=provider`
   - `fallbackUsed=false`
+- D-2.3 当前还已完成 SSE chat completion chunk 解析回归验证：
+  - provider 返回 `text/event-stream` 时，`/api/narrative/resolve` 仍可稳定返回 `source=provider`
+  - SSE 路径下 `fallbackUsed=false`
 - D-2.3 当前 provider route、parser 兼容、前端 timeline 接入与 fallback 语义已相互印证：当前 narrative provider 最小闭环已成立
 
 ## 8. 当前实现执行状态
 - 当前执行代理：主会话直接实现
-- 当前执行模式：主会话直推 / Review 已完成，本地稳定快照与远端同步均已完成
+- 当前执行模式：主会话直推 / 当前工作树已补最新状态与回归验证，待形成新的稳定快照并完成远端同步
 - 当前会话策略：单任务隔离
 - 当前 repo / cwd：xiangqi-web
-- 当前轮次：项目启动 / Task Bundle D-2.3
+- 当前轮次：项目启动 / Task Bundle D-2.3 → 下一轮问题切片前的状态落盘
 - 当前 task bundle：Task Bundle D-2.3（真实 narrative 模型接入最小闭环）
-- 当前执行状态：d2-3-closed-local-and-remote-synced
-- 最近一次执行结果：D-2.3 review 已形成，文档已回写，本地稳定快照与远端同步均已完成
-- 当前会话是否仍可复用：是（可直接承接下一轮判断）
+- 当前执行状态：d2-3-state-capture-before-next-slice
+- 最近一次执行结果：当前工作树验证已通过，新增 SSE 解析回归与客户端补测状态已回写，待 commit / push
+- 当前会话是否仍可复用：是（可直接承接新一轮专项判断）
 
 ## 9. 恢复提示
 默认恢复顺序：
 1. 先看本状态卡
 2. 再看 `review.md`
-3. 再看 `execution-contract.md`
-4. 再看 `docs/Task Bundle D-2.3 实现交接.md`
-5. 直接进入下一轮判断，不要再回退到“是否进入 review”“provider 是否能接通”“是否已形成本地稳定快照”或“远端是否已同步”的旧问题
+3. 再看 `docs/Task Bundle D-2.3 真实页面人工联调记录.md`
+4. 再看 `execution-contract.md`
+5. 直接从“当前工作树 commit / push 收口 → 新起一轮专项处理对局 AI / 演绎 AI 体验问题”继续，不要再回退到“D-2.3 是否成立”“provider 是否能接通”这类旧问题
