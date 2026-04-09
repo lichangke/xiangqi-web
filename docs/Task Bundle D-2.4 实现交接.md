@@ -95,6 +95,7 @@
 6. **文档与状态回写成立**
    - `sdd-status.md` 已同步到 D-2.4 当前轮结果
    - `review.md` 已新增 D-2.4 的验收记录入口
+   - `docs/Task Bundle D-2.4 真实页面 smoke 记录.md` 已补充页面层验证留痕
 
 ---
 
@@ -127,6 +128,10 @@
      - provider 返回合法步时，AI 采用 provider 结果
      - provider 返回非法步时，系统 fallback 到本地 decision 引擎且最终落子仍合法
 
+6. **补齐页面 smoke 留痕**
+   - 新增 `docs/Task Bundle D-2.4 真实页面 smoke 记录.md`
+   - 记录后台配置页、用户页真实页面 smoke 与页面层 provider 命中确认结果
+
 ---
 
 ## 6. 关键边界提醒
@@ -148,6 +153,7 @@
 - `sdd-status.md`
 - `review.md`
 - 本文档 `docs/Task Bundle D-2.4 实现交接.md`
+- `docs/Task Bundle D-2.4 真实页面 smoke 记录.md`
 
 ### 重点参考
 - `apps/server/src/domain/game/game-service.ts` 中当前对局 AI 决策主链路
@@ -169,9 +175,13 @@
 - AI 最终落子仍然合法，不破坏对局主链路
 - `npm test` 通过（33/33）
 - `npm run build` 通过
+- 已补真实页面 smoke：
+  - 后台配置页可正常保存 decision 配置
+  - 用户页真实落子后，AI 可正常给出合法应手
+  - 页面讨论区真实出现 provider 返回的 `reason`，说明页面层 provider 命中成立
 
 本轮尚未补做：
-- 管理员已配置 decision 模型后的真实页面 smoke
+- 外部线上真实 provider 的页面层长期稳定命中验证
 - 更高阶 decision prompt / 输入契约 / 棋力体验专项验证
 
 ---
@@ -181,4 +191,5 @@
 - 当前已形成 **decision 真实模型接入最小闭环**
 - 当前明确只接 decision，没有把 narrative 文案质量一起打包收口
 - 当前已保留规则合法性与 fallback 决策链路，没有为了“真实接入”牺牲对局稳定性
-- 当前可直接进入稳定快照提交与远端同步
+- 当前已补真实页面 smoke，且页面层 provider 命中已确认
+- 当前可直接进入新的稳定快照提交与远端同步
