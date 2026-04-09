@@ -348,6 +348,148 @@ describe('auth and game APIs', () => {
   });
 
 
+
+  it('should use decision provider move when provider returns a legal move', async () => {
+    const previousDecisionKey = process.env.DECISION_API_KEY;
+    process.env.DECISION_API_KEY = 'sk-test-decision-key';
+
+    const createdGame = await createGame();
+    const userMove = rules.getLegalMoves(createdGame.currentFen)[0];
+    expect(userMove).toBeTruthy();
+
+    const afterUserMove = rules.applyMove(createdGame.currentFen, { from: userMove.from, to: userMove.to });
+    expect(afterUserMove.ok).toBe(true);
+    if (!afterUserMove.ok) {
+      throw new Error('expected legal user move');
+    }
+
+    const providerMove = rules.getLegalMoves(afterUserMove.nextFen)[1] ?? rules.getLegalMoves(afterUserMove.nextFen)[0];
+    expect(providerMove).toBeTruthy();
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes('/v1/chat/completions')) {
+        return new Response(JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  move: {
+                    from: providerMove.from,
+                    to: providerMove.to,
+                  },
+                  reason: '优先抢中路节拍。',
+                }),
+              },
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }
+
+      return originalFetch(input as any, init);
+    });
+
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/games/${createdGame.id}/moves`,
+        headers: { authorization: `Bearer ${demoToken}` },
+        payload: { from: userMove.from, to: userMove.to },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().aiMove.from).toBe(providerMove.from);
+      expect(response.json().aiMove.to).toBe(providerMove.to);
+      expect(response.json().aiMove.decision.situationShift).toContain('优先抢中路节拍');
+      expect(fetchMock).toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (previousDecisionKey === undefined) {
+        delete process.env.DECISION_API_KEY;
+      } else {
+        process.env.DECISION_API_KEY = previousDecisionKey;
+      }
+    }
+  });
+
+  it('should fallback to local decision engine when provider returns an illegal move', async () => {
+    const previousDecisionKey = process.env.DECISION_API_KEY;
+    process.env.DECISION_API_KEY = 'sk-test-decision-key';
+
+    const createdGame = await createGame();
+    const userMove = rules.getLegalMoves(createdGame.currentFen)[0];
+    expect(userMove).toBeTruthy();
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes('/v1/chat/completions')) {
+        return new Response(JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  move: {
+                    from: 'a0',
+                    to: 'a9',
+                  },
+                  reason: '故意返回非法步。',
+                }),
+              },
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }
+
+      return originalFetch(input as any, init);
+    }) as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/games/${createdGame.id}/moves`,
+        headers: { authorization: `Bearer ${demoToken}` },
+        payload: { from: userMove.from, to: userMove.to },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().aiMove).toBeTruthy();
+      const userApplied = rules.applyMove(createdGame.currentFen, { from: userMove.from, to: userMove.to });
+      expect(userApplied.ok).toBe(true);
+      if (!userApplied.ok) {
+        throw new Error('expected legal user move');
+      }
+      expect(rules.validateMove(userApplied.nextFen, { from: response.json().aiMove.from, to: response.json().aiMove.to }).ok).toBe(true);
+      expect(response.json().aiMove.decision).toBeTruthy();
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (previousDecisionKey === undefined) {
+        delete process.env.DECISION_API_KEY;
+      } else {
+        process.env.DECISION_API_KEY = previousDecisionKey;
+      }
+    }
+  });
+
   it('should resolve narrative route from provider with compact response shape', async () => {
     const previousNarrativeKey = process.env.NARRATIVE_API_KEY;
     process.env.NARRATIVE_API_KEY = 'sk-test-narrative-key';

@@ -376,6 +376,47 @@ function buildSituationShift(
 export class StandardAiDecisionEngine {
   constructor(private readonly rules: RuleAdapter) {}
 
+  buildDecisionFromMove(
+    input: {
+      fenAfterUserMove: string;
+      difficulty: Difficulty;
+      history: PersistedMoveRecord[];
+      userMove: PersistedMoveRecord;
+      userFenBefore: string;
+    },
+    chosenMove: RuleMove,
+    providerReason?: string,
+  ): DecisionResult {
+    const aiApplied = this.rules.applyMove(input.fenAfterUserMove, chosenMove);
+    if (!aiApplied.ok) {
+      throw new Error('Decision engine selected illegal move');
+    }
+
+    const userMoveTag = classifyMove(input.userMove, input.userFenBefore, input.fenAfterUserMove, this.rules, 'USER');
+    const aiMoveTag = classifyMove(chosenMove, input.fenAfterUserMove, aiApplied.nextFen, this.rules, 'AI');
+    const pressureSide = derivePressureSide(userMoveTag, aiMoveTag, aiApplied.summary);
+    const turnArc = deriveTurnArc(userMoveTag, aiMoveTag, aiApplied.summary.isCheck, aiApplied.summary.isGameOver);
+    const storyThreadSummary = buildStoryThreadSummary(input.history, {
+      userMoveTag,
+      aiMoveTag,
+      turnArc,
+      pressureSide,
+    });
+    const highlightReason = buildHighlightReason(chosenMove, aiApplied.summary);
+
+    return {
+      chosenMove,
+      userMoveTag,
+      aiMoveTag,
+      situationShift: providerReason?.trim() || buildSituationShift(userMoveTag, aiMoveTag, pressureSide, turnArc, chosenMove),
+      turnArc,
+      storyThreadSummary,
+      highlightReason: highlightReason.length ? highlightReason : undefined,
+      riskLevel: deriveRiskLevel(userMoveTag, aiMoveTag, aiApplied.summary),
+      pressureSide,
+    };
+  }
+
   decide(input: {
     fenAfterUserMove: string;
     difficulty: Difficulty;
@@ -402,34 +443,7 @@ export class StandardAiDecisionEngine {
       });
 
     const chosenMove = scoredMoves[chooseIndex(input.difficulty, scoredMoves.length)]?.move ?? scoredMoves[0].move;
-    const aiApplied = this.rules.applyMove(input.fenAfterUserMove, chosenMove);
-    if (!aiApplied.ok) {
-      throw new Error('Decision engine selected illegal move');
-    }
-
-    const userMoveTag = classifyMove(input.userMove, input.userFenBefore, input.fenAfterUserMove, this.rules, 'USER');
-    const aiMoveTag = classifyMove(chosenMove, input.fenAfterUserMove, aiApplied.nextFen, this.rules, 'AI');
-    const pressureSide = derivePressureSide(userMoveTag, aiMoveTag, aiApplied.summary);
-    const turnArc = deriveTurnArc(userMoveTag, aiMoveTag, aiApplied.summary.isCheck, aiApplied.summary.isGameOver);
-    const storyThreadSummary = buildStoryThreadSummary(input.history, {
-      userMoveTag,
-      aiMoveTag,
-      turnArc,
-      pressureSide,
-    });
-    const highlightReason = buildHighlightReason(chosenMove, aiApplied.summary);
-
-    return {
-      chosenMove,
-      userMoveTag,
-      aiMoveTag,
-      situationShift: buildSituationShift(userMoveTag, aiMoveTag, pressureSide, turnArc, chosenMove),
-      turnArc,
-      storyThreadSummary,
-      highlightReason: highlightReason.length ? highlightReason : undefined,
-      riskLevel: deriveRiskLevel(userMoveTag, aiMoveTag, aiApplied.summary),
-      pressureSide,
-    };
+    return this.buildDecisionFromMove(input, chosenMove);
   }
 
   buildFallbackDecision(input: {

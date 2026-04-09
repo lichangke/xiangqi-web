@@ -1,6 +1,7 @@
 import { Difficulty, GameStatus, type GameSession, type PrismaClient } from '@prisma/client';
 import type { GameActor } from '@xiangqi-web/shared';
 import { StandardAiDecisionEngine } from '../ai/decision/standard-ai-decision.js';
+import { DecisionProviderService } from '../ai/decision/decision-provider-service.js';
 import type { MoveInput, RuleAdapter } from '../rules/types.js';
 import { HttpError } from '../../utils/http-error.js';
 import {
@@ -57,12 +58,14 @@ function logAiFailure(payload: { failureReason: string; turnType: 'turn' | 'even
 
 export class GameService {
   private readonly decisionEngine: StandardAiDecisionEngine;
+  private readonly decisionProviderService: DecisionProviderService;
 
   constructor(
     private readonly prisma: PrismaClient,
     private readonly rules: RuleAdapter,
   ) {
     this.decisionEngine = new StandardAiDecisionEngine(rules);
+    this.decisionProviderService = new DecisionProviderService(prisma, rules);
   }
 
   async createGame(userId: string, difficultyValue: string) {
@@ -156,8 +159,18 @@ export class GameService {
     };
 
     let decision;
+    const legalMoves = this.rules.getLegalMoves(userMoveResult.nextFen);
     try {
-      decision = this.decisionEngine.decide(decisionInput);
+      const providerDecision = await this.decisionProviderService.resolveDecision({
+        ...decisionInput,
+        legalMoves,
+      });
+
+      if (providerDecision) {
+        decision = this.decisionEngine.buildDecisionFromMove(decisionInput, providerDecision.move, providerDecision.reason);
+      } else {
+        decision = this.decisionEngine.decide(decisionInput);
+      }
     } catch (error) {
       logAiFailure({
         failureReason: error instanceof Error ? error.message : 'decision_engine_failed',

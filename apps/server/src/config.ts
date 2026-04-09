@@ -8,4 +8,7 @@ export const config = {
   get narrativeApiKey() {
     return process.env.NARRATIVE_API_KEY?.trim() ?? '';
   },
+  get decisionApiKey() {
+    return process.env.DECISION_API_KEY?.trim() ?? '';
+  },
 };

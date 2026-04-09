@@ -2,7 +2,7 @@
 
 ## 文档头信息
 - 文档名称：execution-contract
-- 当前状态：草案中
+- 当前状态：已确认
 - 所属阶段：Execution Contract
 - 所属项目：xiangqi-web / 网页版中国象棋项目
 - 所属功能 / 子功能：Task Bundle D-2.4 执行协议（decision 真实模型接入最小闭环）
@@ -58,7 +58,7 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 
 ### 对应任务范围
 - 任务组：任务组 E（D-2.4 增量切片）
-- 当前轮次定位：Task Bundle D-2.4 / Implement handoff
+- 当前轮次定位：Task Bundle D-2.4 / Implement + Review 回收
 - 对应任务：围绕对局 AI 决策主链路与后台模型配置约束形成增量闭环，不视为 narrative / 平台化能力全部完成
 
 ---
@@ -164,11 +164,11 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 - narrative 展示与页面主链路不回退
 
 ### 回归验证
-至少执行并回报：
-- 与 decision 生成、合法性校验、fallback 直接相关的测试
+本轮已执行并通过：
+- 与 decision 生成、合法性校验、fallback 直接相关的集成测试
 - 必要的 server / integration 测试
-- `npm test`
-- `npm run build`
+- `npm test`（33/33 通过）
+- `npm run build`（通过）
 
 ### 最低完成标准
 - 无验证结果，不算完成
@@ -219,9 +219,9 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 ## 10. 审核结论
 ### 本轮审核意见
 - D-2.3 已完成 review 收口并形成远端稳定快照
-- 当前已决定进入 D-2.4，但只做 decision 真实模型接入最小闭环
-- `docs/Task Bundle D-2.4 实现交接.md` 将作为本轮 handoff 文档落盘
-- 当前执行协议已切换到 Task Bundle D-2.4，可直接用于本轮实现与回收
+- 当前已决定进入 D-2.4，且本轮已按约定范围完成实现与验证
+- `docs/Task Bundle D-2.4 实现交接.md` 已作为 handoff 文档被实际消费并回收
+- 当前执行协议已完成其本轮职责，可直接支撑稳定快照提交与远端同步
 
 ### 是否允许进入 Implement
 - [x] 是
