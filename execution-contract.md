@@ -5,15 +5,15 @@
 - 当前状态：已确认
 - 所属阶段：Execution Contract
 - 所属项目：xiangqi-web / 网页版中国象棋项目
-- 所属功能 / 子功能：Task Bundle D-2.4 执行协议（decision 真实模型接入最小闭环）
+- 所属功能 / 子功能：Task Bundle D-2.5 执行协议（外部线上 provider 页面层稳定命中验证）
 - 上游文档：spec.md, plan.md, tasks.md, review.md
 - 创建时间：2026-04-09
-- 最后更新时间：2026-04-09
+- 最后更新时间：2026-04-11
 
 ## 关联更新检查
 本文档更新后，至少检查是否需要同步更新：
 - `sdd-status.md`
-- `docs/Task Bundle D-2.4 实现交接.md`
+- `docs/Task Bundle D-2.5 实现交接.md`
 - 当前执行摘要
 - 必要时 `review.md`
 
@@ -22,44 +22,44 @@
 ---
 
 ## 1. 执行目标
-本轮执行协议服务于 V1 实现的 **Task Bundle D-2.4（decision 真实模型接入最小闭环）**。
+本执行协议服务于 V1 的 **Task Bundle D-2.5（外部线上 provider 页面层稳定命中验证）**。
 
-D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，也不把“narrative 文案质量优化”“完整 secret 安全方案”“完整连通性平台”混入这一轮，而是只把 **decision 真实模型接入** 做成最小闭环：
-1. 服务端新增 decision 真实模型决策承载位
-2. 当前对局主链路继续以“合法落子优先”为硬约束
-3. 当后台 `decision` 模型已配置，且 server env 中存在真实 API Key 承载位时，可尝试走真实模型生成候选步
-4. 当模型未配置、env 缺失真实 API Key、超时、返回空结果、schema 非法或候选步非法时，自动回退到当前本地 decision 引擎，不中断主链路
+D-2.4 已完成 review 收口、页面 smoke 补验收与远端同步。D-2.5 当前轮已完成的关键收口是：
+1. 已确认 `codex.hiyo.top` 当前不应继续按 `chat/completions` 接入，而应按 `responses` 接入；
+2. 已确认该 provider 在非流式 `responses` 下，最终 completed response 可能保持 `output / output_text` 为空；
+3. 已通过最小矩阵试探确认：当前正文真实存在于 streaming `response.output_text.delta` 事件中；
+4. 已将 decision provider 的 `responses` 分支改为流式 SSE delta 读取正文；
+5. 已在真实主链路验证中确认 `bundle-d24-decision-provider-success`，说明当前页面层外部线上 provider 命中已成立。
 
-本轮目标不是 narrative 提示词重写，不是完整并发策略打满，不是完整 secret 安全体系，而是：
-> 先把“decision 能真实接上后台配置模型，失败时还能平稳退回本地决策引擎”这件事做实。
+本轮目标不是更强棋力，不是 narrative 重做，不是完整 secret 持久化，也不是完整连通性平台，而是：
+> 先把“页面层接入外部线上 provider 到底稳不稳”这件事单独验证清楚，并留下足够的观测与结论。
+
+当前该目标已完成并回收。
 
 ---
 
 ## 2. 本轮执行范围
 ### 明确包含
-- 新增 server 侧 decision 生成 / 编排入口
-- 让 decision 运行时读取后台 `decision` 模型配置，而不是新增第二主配置源
-- 本轮允许 server env 仅承载真实 API Key；`modelName / baseUrl / enabled` 仍继续读取后台 `decision` model config
-- 对真实模型输出增加规则合法性校验，不能绕过规则层直接落子
-- 保持当前 `GameService` / `DecisionResult` 主链路结构不被破坏
-- 保持模型失败、超时、空结果、schema 非法、候选步非法时 fallback 到现有本地 decision 引擎
-- 为真实 decision 调用失败记录最小日志或错误摘要，便于后续回看
-- 补齐与上述链路直接相关的测试、验证与状态回写
+- 以当前 D-2.4 已实现的 decision provider 主链路为前提，补一轮面向 **外部线上 provider** 的页面层稳定命中验证
+- 为 decision provider 命中 / fallback / 空 response / 协议类型等结果补最小可观察日志或样本摘要
+- 在后台配置真实线上 provider 的前提下，完成最小真实页面 smoke，并明确记录结果
+- 判断“页面层是否稳定命中 provider”当前结论
+- 补齐与上述验证直接相关的状态文档、smoke 记录与 review 结论
 
 ### 明确不包含
-- narrative 模型外接重做
-- 演绎文案质量专项优化
-- 完整 secret 安全持久化体系重构
-- 完整模型连通性测试平台
-- `maxConcurrentAiGames` 在真实模型链路中的完整限流兑现
+- decision 提示词重写
+- 决策输入契约大改
 - 搜索型棋力引擎化改造
-- Bundle C 已通过部分的大回炉重写
-- D-2.3 范围回流扩写
+- narrative 重做
+- 完整 secret 安全持久化体系
+- 完整 provider 健康检查 / 连通性测试平台
+- 并发治理平台
+- 擅自扩大到新的平台级重构
 
 ### 对应任务范围
-- 任务组：任务组 E（D-2.4 增量切片）
-- 当前轮次定位：Task Bundle D-2.4 / Implement + Review 回收
-- 对应任务：围绕对局 AI 决策主链路与后台模型配置约束形成增量闭环，不视为 narrative / 平台化能力全部完成
+- 任务组：任务组 E（D-2.5 增量切片）
+- 当前轮次定位：Task Bundle D-2.5 / Verification + Review 回收
+- 对应任务：围绕“外部线上 provider 页面层是否稳定命中”形成最小验证闭环，不视为 decision 体验、secret 或 provider 平台化能力全部完成
 
 ---
 
@@ -70,9 +70,9 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 - [ ] 高频同步（仅特殊情况）
 
 ### 默认说明
-- 默认由主会话直接实现并回收本轮 D-2.4 切片
+- 默认由主会话直接实现并回收本轮 D-2.5 切片
 - 普通调试、局部试错、小范围结构调整不需要逐条同步
-- 完成最小闭环、出现关键阻塞、发现范围漂移或需要用户拍板时再回报
+- 完成验证闭环、出现关键阻塞、发现范围漂移或需要用户拍板时再回报
 
 ---
 
@@ -81,14 +81,14 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 - 执行者：主会话直接实现
 - 会话策略：单 repo + 单轮次 + 单 task bundle
 - 当前 repo / cwd：xiangqi-web
-- 当前轮次：项目启动 / Task Bundle D-2.4
-- 当前 task bundle：Task Bundle D-2.4（decision 真实模型接入最小闭环）
+- 当前轮次：项目启动 / Task Bundle D-2.5
+- 当前 task bundle：Task Bundle D-2.5（外部线上 provider 页面层稳定命中验证）
 
 ### 本轮目标
-- 完成 decision 真实模型入口的 server 化
-- 保持对局主链路合法性不回退
-- 完成“已配置走真实模型 / 失败时回退本地 decision 引擎”的闭环
-- 保持 narrative、规则合法性与当前页面主链路稳定
+- 验证页面层接入外部线上 provider 是否稳定命中
+- 区分 provider 命中、fallback、空 response、协议类型等关键差异
+- 保持当前 fallback 主链路不退化
+- 形成足够清晰的文档化结论，支撑下一轮是否进入“decision 输入契约 / prompt / 体验优化”
 
 ### 权威输入
 #### 必读文档
@@ -99,37 +99,37 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 - `execution-contract.md`
 - `sdd-status.md`
 - `docs/Task Bundle D-2.4 实现交接.md`
+- `docs/Task Bundle D-2.4 真实页面 smoke 记录.md`
+- `docs/Task Bundle D-2.5 实现交接.md`
 
 #### 当前轮次直接依据
-- `spec.md` 中对局 AI 合法落子、后台模型配置与未配置状态的相关约束
-- `plan.md` 中 AI decision 层与后台配置服务的结构边界
-- `apps/server/src/domain/game/game-service.ts` 中当前 `decisionEngine.decide()` 的调用主链路
-- `apps/server/src/domain/ai/decision/standard-ai-decision.ts` 中当前本地启发式 decision 逻辑
-- D-2.1 / D-2.2 已完成的模型配置与未配置状态能力
-- D-2.3 已完成的 provider URL / env / schema / fallback 最小经验
-- 当前后台 `ModelConfig` 现状仅保留 `apiKeyMaskedHint`，不保存可供运行时直接消费的真实 API Key；因此本轮若采用 env 落地，只能作为 server 侧真实密钥承载位，而不改写后台配置作为 `modelName / baseUrl / enabled` 主来源的地位
+- D-2.4 已形成的 decision provider 主链路与 fallback 约束
+- D-2.4 review 结论：页面层 provider 命中已经在本地 mock provider 下确认成立
+- D-2.5 当前已确认的新事实：`codex.hiyo.top` 必须按 `Responses API + streaming delta` 口径接入
+- `apps/server/src/domain/ai/decision/decision-provider-service.ts` 中当前 provider 调用、streaming delta 读取与日志逻辑
+- `apps/server/src/domain/game/game-service.ts` 中当前用户落子后 provider 优先 / fallback 次序
+- 后台 `decision` 模型配置现状仍为：`modelName / baseUrl / enabled` 锚定后台配置，真实 API Key 仍以 env 承载
 
-若历史上下文、旧实现想法或未确认草案与以上文档冲突，以以上文档为准。
+若历史上下文、旧会话理解或未确认草案与以上文档冲突，以以上文档为准。
 
 ### 修改边界
 #### 允许修改
 - `apps/server/`
 - `apps/web/`
-- `packages/shared/`
 - `tests/`
-- 与当前轮次直接联动的状态 / 交接文档
+- 与当前轮次直接联动的状态 / smoke / review 文档
 
 #### 不允许修改
 - 已确认的 `spec.md` / `plan.md` / `tasks.md` 边界
 - 与当前切片无关的大重构
 - 擅自扩写新的实现范围以“顺手做掉后续内容”
-- 为追求“更强棋力”直接改造成复杂搜索引擎项目
+- 把当前验证专项直接扩写成完整 provider 平台或完整 secret 系统
 
 ---
 
 ## 5. 汇报与返回规则
 ### 默认应返回
-- 完成 Task Bundle D-2.4 后
+- 完成 Task Bundle D-2.5 后
 - 出现关键阻塞时
 - 发现需要调整 Plan / Tasks / Contract 时
 - 出现范围漂移风险时
@@ -150,51 +150,60 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 - 需要用户拍板
 - 当前代码现状与权威文档严重不一致
 - 核心验证失败且无法快速收敛
-- 若要继续推进必须引入新的 provider SDK / 敏感配置机制，而当前项目无现成承载位
-- 若发现仅靠 env 落地仍不足以满足“后台 decision 模型已配置即可运行”的既定口径，需要先回到当前执行协议修订，而不是直接扩写到完整 secret 持久化体系
+- 若要继续推进必须引入新的平台级连通性设施，而当前项目无现成承载位
+- 若要继续推进必须把 scope 扩写到完整 secret 持久化或完整 provider 平台，应先回到当前执行协议修订，而不是直接扩写实现
 
 ---
 
 ## 6. 测试与验证要求
 ### 主链路验证
-- 后台 decision 配置存在且 server env 中存在真实 API Key 时，系统可尝试走真实 decision 生成
-- decision 结果需满足当前对局主链路的合法性要求
-- decision 生成失败、超时、空结果、schema 非法、候选步非法，或 env 缺失真实 API Key 时，会稳定 fallback 到本地 decision 引擎
-- 对局主链路不因真实 decision 接入而断裂
-- narrative 展示与页面主链路不回退
+- 后台 decision 配置切换到外部线上 provider 后，页面真实落子时系统能够尝试走真实 provider
+- 能区分并记录至少以下结果之一：
+  - provider 成功命中
+  - 前置条件缺失
+  - 网络 / fetch 失败
+  - 超时
+  - schema 非法
+  - 候选步非法
+  - fallback 生效
+- 即使 provider 不稳定，页面主链路也不得因此断裂
+- 最终必须给出当前结论：稳定命中 / 不稳定命中 / 受条件限制命中
 
 ### 回归验证
-本轮已执行并通过：
-- 与 decision 生成、合法性校验、fallback 直接相关的集成测试
+至少执行并回报：
+- 与 decision provider 命中观测、fallback 与页面 smoke 直接相关的验证
 - 必要的 server / integration 测试
-- `npm test`（33/33 通过）
-- `npm run build`（通过）
+- 若本轮代码改动触发回归风险，补跑 `npm test`
+- 若本轮代码改动影响构建，补跑 `npm run build`
 
 ### 最低完成标准
-- 无验证结果，不算完成
-- 无法执行验证时，必须说明原因、影响范围与剩余风险
+- 无真实页面样本，不算完成
+- 无命中 / 失败类型归因，不算完成
+- 无状态记录与结论回写，不算完成
 
 ---
 
 ## 7. 文档与状态更新要求
 本轮完成后，至少同步更新：
 - `sdd-status.md`
-- 当前验证结果摘要
+- `review.md`
+- `docs/Task Bundle D-2.5 实现交接.md`
+- `docs/Task Bundle D-2.5 真实页面 smoke 记录.md`
 - 当前执行状态
 - 下一步动作
 - 是否存在阻塞
 
 默认原则：
-> 代码改完不等于 handoff 完成；只有代码、验证、状态卡和当前结论形成一致闭环，才算本轮 handoff 完成。
+> 本轮不是“多跑几下页面”就算完成；只有样本、归因、结论与状态卡形成一致闭环，才算本轮 handoff 完成。
 
 ---
 
 ## 8. 回退规则
 出现以下情况时应回退而非硬推：
 - 已确认文档之间存在关键冲突
-- 当前 task 定义不足以支撑继续实现
+- 当前 task 定义不足以支撑继续验证
 - 当前实现代价远超预期并影响阶段策略
-- 为满足本轮目标必须扩大到 narrative 重做、完整 secret 体系或 provider 层重构
+- 为满足本轮目标必须扩大到完整 secret 体系、完整 provider 平台或大范围前后端重构
 
 ### 回退目标
 - [ ] 回到 Specify
@@ -205,24 +214,29 @@ D-2.3 已完成 review 收口并已推送远端。当前不回流扩写 D-2.3，
 ---
 
 ## 9. 完成定义
-本轮 Task Bundle D-2.4 只有同时满足以下条件才算完成：
+本轮 Task Bundle D-2.5 只有同时满足以下条件才算完成：
 - 已覆盖本轮约定范围
-- 已形成真实代码改动
+- 已形成真实页面样本与必要的代码 / 日志 / 文档改动（如有）
 - 已完成必要验证
 - 已更新状态记录
 - 无未披露关键阻塞
-- 明确说明是否已形成 decision 真实模型接入最小闭环
-- 明确说明 narrative 是否仍保持当前链路（默认应保持）
+- 明确说明“外部线上 provider 页面层是否稳定命中”的当前结论
+- 明确说明当前是否适合进入下一轮 decision 输入契约 / prompt / 体验优化
+
+当前以上条件均已满足。
 
 ---
 
 ## 10. 审核结论
 ### 本轮审核意见
-- D-2.3 已完成 review 收口并形成远端稳定快照
-- 当前已决定进入 D-2.4，且本轮已按约定范围完成实现与验证
-- `docs/Task Bundle D-2.4 实现交接.md` 已作为 handoff 文档被实际消费并回收
-- 当前执行协议已完成其本轮职责，可直接支撑稳定快照提交与远端同步
+- D-2.5 已完成协议判断、最小矩阵试探、streaming delta 正文兼容修正与真实主链路 provider-success 验证
+- `docs/Task Bundle D-2.5 实现交接.md`、`review.md`、`sdd-status.md` 与 smoke 记录已完成回写
+- 当前执行协议已完成其服务周期，不再停留在“待 Implement”的草案状态
 
 ### 是否允许进入 Implement
-- [x] 是
+- [x] 是（对 D-2.5 而言已执行完成）
 - [ ] 否
+
+### 当前结果判断
+- [x] 本轮已完成并回收
+- [ ] 当前仍待执行

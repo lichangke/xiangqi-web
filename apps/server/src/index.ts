@@ -1,11 +1,18 @@
 import dotenv from 'dotenv';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildApp } from './app.js';
 import { config } from './config.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const projectRootEnvPath = path.resolve(currentDir, '../../.env');
 const workspaceRootEnvPath = path.resolve(currentDir, '../../../.env');
+
+if (fs.existsSync(projectRootEnvPath)) {
+  dotenv.config({ path: projectRootEnvPath, override: false, quiet: true });
+}
+
 dotenv.config({ path: workspaceRootEnvPath, override: false, quiet: true });
 
 const app = buildApp();

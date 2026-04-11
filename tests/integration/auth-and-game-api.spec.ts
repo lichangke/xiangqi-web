@@ -374,6 +374,27 @@ describe('auth and game APIs', () => {
           ? input.toString()
           : input.url;
 
+      if (url.includes('/responses')) {
+        return new Response([
+          'data: ' + JSON.stringify({ type: 'response.created' }),
+          'data: ' + JSON.stringify({ type: 'response.output_text.delta', delta: '{"move":{"from":"' + providerMove.from + '","to":"' + providerMove.to + '"},"reason":"优先抢中路节拍。"}' }),
+          'data: ' + JSON.stringify({
+            type: 'response.completed',
+            response: {
+              id: 'resp_test_decision_ok',
+              status: 'completed',
+              output: [],
+              output_text: '',
+            },
+          }),
+          'data: [DONE]',
+          '',
+        ].join('\n'), {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }) as Response;
+      }
+
       if (url.includes('/v1/chat/completions')) {
         return new Response(JSON.stringify({
           choices: [
@@ -438,6 +459,27 @@ describe('auth and game APIs', () => {
         : input instanceof URL
           ? input.toString()
           : input.url;
+
+      if (url.includes('/responses')) {
+        return new Response([
+          'data: ' + JSON.stringify({ type: 'response.created' }),
+          'data: ' + JSON.stringify({ type: 'response.output_text.delta', delta: '{"move":{"from":"a0","to":"a9"},"reason":"故意返回非法步。"}' }),
+          'data: ' + JSON.stringify({
+            type: 'response.completed',
+            response: {
+              id: 'resp_test_decision_bad',
+              status: 'completed',
+              output: [],
+              output_text: '',
+            },
+          }),
+          'data: [DONE]',
+          '',
+        ].join('\n'), {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }) as Response;
+      }
 
       if (url.includes('/v1/chat/completions')) {
         return new Response(JSON.stringify({
