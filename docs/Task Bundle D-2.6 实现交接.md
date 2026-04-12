@@ -96,4 +96,7 @@ D-2.5 已回答并收口：
 - D-2.5 已完成收口，不再承载新问题
 - D-2.6 的 execution-contract 已收清并确认，可作为当前轮 implement 的权威执行入口
 - 当前已完成一轮真实 provider 下的观察型 smoke：在 `gpt-5.4 + https://codex.hiyo.top/v1 + responses` 口径下，`/api/games/:id/moves` 真实返回 200，provider-success 成立，且新增的 `payloadSummary / responsesSummary` 已在真实日志中出现；本轮真实样本中 AI 应手为 `b8b1`，`situationShift` 为“换子施压并破坏对方侧翼。”，说明 D-2.6 当前结构化 contract 已不只停留在测试层，而已进入真实链路可观察状态
+- 当前已补网页实测后的两点问题总结：
+  1. **decision / narrative 后台模型配置曾短暂偏离当前收口口径**，其中 `decision` 一度被错误配置为示例 provider（`demo-decision + https://api.example.com/v1`），`narrative` 一度未配置且未启用，导致网页实测当下实际未稳定命中目标大模型主链路；后续已修正回 `gpt-5.4 + https://codex.hiyo.top/v1`，并经网页实测、服务端日志与大模型后台 token 消耗共同确认：两条链路都已实际调用大模型
+  2. **客户端 / 管理端 / 服务端公网访问一度不可用**，问题暴露时外部电脑无法稳定访问 `5173 / 5174 / 3000`；后续在确认服务实际启动与公网访问恢复后，用户端、管理端与 `/api/health` 已重新可达
 - 下一步应从“已有真实观察样本”转向 review 收口判断：是继续补第二个真实样本，还是直接基于当前真实样本 + 定向验证准备 D-2.6 review 草稿
