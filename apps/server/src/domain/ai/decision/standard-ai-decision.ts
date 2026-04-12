@@ -373,6 +373,24 @@ function buildSituationShift(
   return `这一回合从${userMoveTag}推进到${aiMoveTag}，双方都还在争抢下一拍的先手。`;
 }
 
+function normalizeSituationShift(providerReason: string | undefined, fallback: string) {
+  const reason = providerReason?.trim();
+  if (!reason) {
+    return fallback;
+  }
+
+  const normalized = reason
+    .replace(/[。！？；]+$/g, '')
+    .trim();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  return `${normalized}。`;
+}
+
+
 export class StandardAiDecisionEngine {
   constructor(private readonly rules: RuleAdapter) {}
 
@@ -404,11 +422,13 @@ export class StandardAiDecisionEngine {
     });
     const highlightReason = buildHighlightReason(chosenMove, aiApplied.summary);
 
+    const fallbackSituationShift = buildSituationShift(userMoveTag, aiMoveTag, pressureSide, turnArc, chosenMove);
+
     return {
       chosenMove,
       userMoveTag,
       aiMoveTag,
-      situationShift: providerReason?.trim() || buildSituationShift(userMoveTag, aiMoveTag, pressureSide, turnArc, chosenMove),
+      situationShift: normalizeSituationShift(providerReason, fallbackSituationShift),
       turnArc,
       storyThreadSummary,
       highlightReason: highlightReason.length ? highlightReason : undefined,

@@ -444,6 +444,285 @@ describe('auth and game APIs', () => {
     }
   });
 
+  it('should send structured decision contract payload to provider', async () => {
+    const previousDecisionKey = process.env.DECISION_API_KEY;
+    process.env.DECISION_API_KEY = 'sk-test-decision-key';
+
+    const createdGame = await createGame();
+    const userMove = rules.getLegalMoves(createdGame.currentFen)[0];
+    expect(userMove).toBeTruthy();
+
+    const afterUserMove = rules.applyMove(createdGame.currentFen, { from: userMove.from, to: userMove.to });
+    expect(afterUserMove.ok).toBe(true);
+    if (!afterUserMove.ok) {
+      throw new Error('expected legal user move');
+    }
+
+    const providerMove = rules.getLegalMoves(afterUserMove.nextFen)[0];
+    expect(providerMove).toBeTruthy();
+
+    const originalFetch = globalThis.fetch;
+    let capturedBody: any = null;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes('/v1/chat/completions')) {
+        capturedBody = JSON.parse(String(init?.body ?? '{}'));
+        return new Response(JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  move: {
+                    from: providerMove.from,
+                    to: providerMove.to,
+                  },
+                  reason: '先把中路节拍稳住。',
+                }),
+              },
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }
+
+      return originalFetch(input as any, init);
+    }) as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/games/${createdGame.id}/moves`,
+        headers: { authorization: `Bearer ${demoToken}` },
+        payload: { from: userMove.from, to: userMove.to },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(capturedBody).toBeTruthy();
+      expect(capturedBody.messages).toHaveLength(2);
+
+      const userPayload = JSON.parse(capturedBody.messages[1].content);
+      expect(userPayload.inputContract.version).toBe('d2.6');
+      expect(userPayload.inputContract.requiredReadOrder).toEqual(['positionState', 'userMove', 'legalMoveDigest', 'priorityCandidates', 'legalMoves', 'recentHistory']);
+      expect(userPayload.positionState.legalMoveCount).toBe(userPayload.legalMoveCount);
+      expect(userPayload.positionState.nextTurn).toBe('b');
+      expect(userPayload.difficultyGuide).toBeTruthy();
+      expect(userPayload.legalMoveDigest.total).toBe(userPayload.legalMoveCount);
+      expect(userPayload.legalMoveDigest.byPiece).toBeTruthy();
+      expect(Array.isArray(userPayload.priorityCandidates)).toBe(true);
+      expect(userPayload.priorityCandidates.length).toBeGreaterThan(0);
+      expect(userPayload.priorityCandidates.length).toBeLessThanOrEqual(8);
+      expect(userPayload.priorityCandidates[0]).toHaveProperty('tacticalTag');
+      expect(userPayload.priorityCandidates[0]).toHaveProperty('why');
+      expect(userPayload.inputContract.noiseControl.legalMovesFields).toEqual(['from', 'to']);
+      expect(userPayload.inputContract.noiseControl.priorityCandidatesMaxCount).toBe(8);
+      expect(userPayload.legalMoves.length).toBe(userPayload.legalMoveCount);
+      expect(Object.keys(userPayload.legalMoves[0]).sort()).toEqual(['from', 'to']);
+      expect(Array.isArray(userPayload.legalMoveDigest.captureMoveSamples)).toBe(true);
+      expect(Array.isArray(userPayload.legalMoveDigest.checkMoveSamples)).toBe(true);
+      expect(Array.isArray(userPayload.legalMoveDigest.centralControlSamples)).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (previousDecisionKey === undefined) {
+        delete process.env.DECISION_API_KEY;
+      } else {
+        process.env.DECISION_API_KEY = previousDecisionKey;
+      }
+    }
+  });
+
+  it('should send structured decision contract payload to responses provider', async () => {
+    const previousDecisionKey = process.env.DECISION_API_KEY;
+    process.env.DECISION_API_KEY = 'sk-test-decision-key';
+
+    await prisma.modelConfig.update({
+      where: { configKey: 'decision' },
+      data: {
+        modelName: 'gpt-5.4',
+        baseUrl: 'https://codex.hiyo.top/v1',
+        enabled: true,
+      },
+    });
+
+    const createdGame = await createGame();
+    const userMove = rules.getLegalMoves(createdGame.currentFen)[0];
+    expect(userMove).toBeTruthy();
+
+    const afterUserMove = rules.applyMove(createdGame.currentFen, { from: userMove.from, to: userMove.to });
+    expect(afterUserMove.ok).toBe(true);
+    if (!afterUserMove.ok) {
+      throw new Error('expected legal user move');
+    }
+
+    const providerMove = rules.getLegalMoves(afterUserMove.nextFen)[0];
+    expect(providerMove).toBeTruthy();
+
+    const originalFetch = globalThis.fetch;
+    let capturedBody: any = null;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes('/responses')) {
+        capturedBody = JSON.parse(String(init?.body ?? '{}'));
+        return new Response([
+          'data: ' + JSON.stringify({ type: 'response.created' }),
+          'data: ' + JSON.stringify({ type: 'response.output_text.delta', delta: '{"move":{"from":"' + providerMove.from + '","to":"' + providerMove.to + '"},"reason":"先把中路节拍稳住。"}' }),
+          'data: ' + JSON.stringify({
+            type: 'response.completed',
+            response: {
+              id: 'resp_test_decision_structured_payload',
+              status: 'completed',
+              output: [],
+              output_text: '',
+            },
+          }),
+          'data: [DONE]',
+          '',
+        ].join('\n'), {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }) as Response;
+      }
+
+      return originalFetch(input as any, init);
+    }) as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/games/${createdGame.id}/moves`,
+        headers: { authorization: `Bearer ${demoToken}` },
+        payload: { from: userMove.from, to: userMove.to },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(capturedBody).toBeTruthy();
+      expect(capturedBody.model).toBe('gpt-5.4');
+      expect(capturedBody.instructions).toContain('priorityCandidates');
+      expect(capturedBody.stream).toBe(true);
+
+      const userPayload = JSON.parse(capturedBody.input[0].content);
+      expect(userPayload.inputContract.version).toBe('d2.6');
+      expect(userPayload.inputContract.requiredReadOrder).toEqual(['positionState', 'userMove', 'legalMoveDigest', 'priorityCandidates', 'legalMoves', 'recentHistory']);
+      expect(userPayload.inputContract.noiseControl.legalMovesFields).toEqual(['from', 'to']);
+      expect(userPayload.inputContract.reasonConstraints.focusTags).toEqual(['压迫', '解围', '抢位', '换子', '收束', '稳阵', '试探']);
+      expect(Array.isArray(userPayload.priorityCandidates)).toBe(true);
+      expect(userPayload.priorityCandidates.length).toBeGreaterThan(0);
+      expect(Object.keys(userPayload.legalMoves[0]).sort()).toEqual(['from', 'to']);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (previousDecisionKey === undefined) {
+        delete process.env.DECISION_API_KEY;
+      } else {
+        process.env.DECISION_API_KEY = previousDecisionKey;
+      }
+    }
+  });
+
+  it('should use fallback situation shift when provider reason is too generic', async () => {
+    const previousDecisionKey = process.env.DECISION_API_KEY;
+    process.env.DECISION_API_KEY = 'sk-test-decision-key';
+
+    const createdGame = await createGame();
+    const userMove = rules.getLegalMoves(createdGame.currentFen)[0];
+    expect(userMove).toBeTruthy();
+
+    const afterUserMove = rules.applyMove(createdGame.currentFen, { from: userMove.from, to: userMove.to });
+    expect(afterUserMove.ok).toBe(true);
+    if (!afterUserMove.ok) {
+      throw new Error('expected legal user move');
+    }
+
+    const providerMove = rules.getLegalMoves(afterUserMove.nextFen)[1] ?? rules.getLegalMoves(afterUserMove.nextFen)[0];
+    expect(providerMove).toBeTruthy();
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+
+      if (url.includes('/responses')) {
+        return new Response([
+          'data: ' + JSON.stringify({ type: 'response.created' }),
+          'data: ' + JSON.stringify({ type: 'response.output_text.delta', delta: '{"move":{"from":"' + providerMove.from + '","to":"' + providerMove.to + '"},"reason":"综合来看，这样可以更好地推进后续局面。"}' }),
+          'data: ' + JSON.stringify({
+            type: 'response.completed',
+            response: {
+              id: 'resp_test_decision_generic_reason',
+              status: 'completed',
+              output: [],
+              output_text: '',
+            },
+          }),
+          'data: [DONE]',
+          '',
+        ].join('\n'), {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }) as Response;
+      }
+
+      if (url.includes('/v1/chat/completions')) {
+        return new Response(JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  move: {
+                    from: providerMove.from,
+                    to: providerMove.to,
+                  },
+                  reason: '综合来看，这样可以更好地推进后续局面。',
+                }),
+              },
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }
+
+      return originalFetch(input as any, init);
+    }) as typeof fetch;
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/games/${createdGame.id}/moves`,
+        headers: { authorization: `Bearer ${demoToken}` },
+        payload: { from: userMove.from, to: userMove.to },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().aiMove.from).toBe(providerMove.from);
+      expect(response.json().aiMove.to).toBe(providerMove.to);
+      expect(response.json().aiMove.decision.situationShift).not.toContain('综合来看');
+      expect(response.json().aiMove.decision.situationShift).not.toContain('这样可以更好地推进后续局面');
+      expect(response.json().aiMove.decision.situationShift).toBeTruthy();
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (previousDecisionKey === undefined) {
+        delete process.env.DECISION_API_KEY;
+      } else {
+        process.env.DECISION_API_KEY = previousDecisionKey;
+      }
+    }
+  });
+
   it('should fallback to local decision engine when provider returns an illegal move', async () => {
     const previousDecisionKey = process.env.DECISION_API_KEY;
     process.env.DECISION_API_KEY = 'sk-test-decision-key';
