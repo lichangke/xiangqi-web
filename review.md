@@ -5,8 +5,8 @@
 - 当前状态：已确认
 - 所属阶段：Review
 - 所属项目：xiangqi-web / 网页版中国象棋项目
-- 所属功能 / 子功能：Task Bundle D-2.7 Review / Acceptance（网页实测 burn-in / 运行口径锁定）
-- 上游文档：spec.md, plan.md, tasks.md, execution-contract.md, docs/Task Bundle D-2.7 实现交接.md, docs/Task Bundle D-2.7 burn-in 记录.md
+- 所属功能 / 子功能：Task Bundle D-2.8 Review / Acceptance（外部访问侧样本 / 扩展 burn-in）
+- 上游文档：spec.md, plan.md, tasks.md, execution-contract.md, docs/Task Bundle D-2.8 实现交接.md, docs/Task Bundle D-2.8 burn-in 记录.md
 - 创建时间：2026-04-13
 - 最后更新时间：2026-04-13
 
@@ -14,7 +14,7 @@
 本文档形成结论后，至少检查是否需要同步更新：
 - `sdd-status.md`
 - `execution-contract.md`
-- `docs/Task Bundle D-2.7 实现交接.md`
+- `docs/Task Bundle D-2.8 实现交接.md`
 - 是否需要继续开启下一轮 feature / task 入口文档
 - 当前仓库是否已形成稳定快照
 
@@ -22,41 +22,42 @@
 
 ## 1. Review 范围
 ### 本轮覆盖内容
-- 当前 `decision / narrative` 目标运行口径锁定
-- 后台模型配置、审计摘要与服务健康检查的最小巡检入口确认
-- 真实对局 API 路径下的 decision 主链路样本
-- 基于真实 turn 数据的 narrative 主链路样本
-- D-2.7 burn-in 记录与最小联合证据沉淀
+- 外部访问等价视角下的客户端 / 管理端 / 服务端可达性样本
+- 外部访问等价视角下的后台关键 API 样本
+- 多回合真实对局 decision 扩展 burn-in
+- 多回合真实回合数据的 narrative 扩展 burn-in
+- D-2.8 burn-in 记录与最小增强证据闭环沉淀
+- D-2.8 期间出现的 narrative 500 异常定性与边界澄清
 
 ### 对应用户故事 / FR / 任务组
-- 用户故事：US3、US5、US6（以真实运行稳定性、配置一致性与体验观察为当前切入点）
+- 用户故事：US3、US5、US6（以外部访问稳定性增强证据、扩展 burn-in 与体验稳定性观察为当前切入点）
 - FR：FR-004 ~ FR-017、FR-023 ~ FR-031
-- 任务组：Task Bundle D-2.7（网页实测 burn-in / 运行口径锁定）
+- 任务组：Task Bundle D-2.8（外部访问侧样本 / 扩展 burn-in）
 
 ---
 
 ## 2. Spec 满足度
 ### 总体判断
-- [x] 满足（以 D-2.7 当前约定边界来看）
+- [x] 满足（以 D-2.8 当前约定边界来看）
 - [ ] 基本满足
 - [ ] 不满足
 
 ### 说明
-若以 **D-2.7 当前边界** 来看，本轮已经完成的关键收口是：
-1. 已将 `decision / narrative` 的目标运行口径重新锁定为 `gpt-5.4 + https://codex.hiyo.top/v1` 且当前均处于启用状态；
-2. 已确认服务端 `/api/health`、后台模型配置列表与审计摘要可作为本轮最小巡检与留痕入口；
-3. 已通过真实对局 API 样本确认 decision 主链路持续可用，而不是只停留在旧轮次历史结论；
-4. 已通过真实 `/api/narrative/resolve` 样本确认 narrative 当前为 `source=provider / fallbackUsed=false`，说明 narrative 也不是靠 fallback 伪装成立；
-5. 已形成 3 条连续证据：配置/健康 → decision 主链路 → narrative 主链路。
+若以 **D-2.8 当前边界** 来看，本轮已经完成的关键收口是：
+1. 已补到两条外部访问等价视角样本，而不再只停留在 localhost / 本机单点观察；
+2. 已确认外部访问等价视角下，`5173 / 5174 / 3000/api/health` 均可达；
+3. 已确认外部访问等价视角下，admin 登录、`/api/admin/model-configs`、`/api/admin/audit-summary` 均可用；
+4. 已通过 `MASTER` 对局下的连续两回合真实样本确认 decision 扩展 burn-in 继续成立；
+5. 已通过同一局第 1 / 2 回合真实 turn 数据确认 narrative 扩展 burn-in 继续成立，且均为 `source=provider / fallbackUsed=false`；
+6. 已将 D-2.8 中出现的一次 `/api/narrative/resolve` 500 定性为“手工 envelope 构造偏离真实前端 `buildTurnEnvelope` 约束”的样本问题，而非 narrative 主链路天然失效。
 
 本轮明确没有完成：
-- 更长时间、多样本的连续 burn-in
-- 外部设备 / 外部网络侧的新增可达性样本
-- 更系统的体验退化评估
-- 完整监控平台或公网稳定性治理
+- 不同真实外部设备 / 不同网络条件下的更强外部访问稳定性证明；
+- 更长时间、更大样本规模的持续 burn-in；
+- 更系统的 narrative 事件类型覆盖、schema 漂移巡检或公网治理能力建设。
 
 因此，本轮正确口径应是：
-**D-2.7 边界内通过；当前已完成运行口径锁定、最小巡检与 decision / narrative 联合主链路验证。若还要继续做更强结论，应在后续追加更长时间 burn-in 或外部访问侧样本，但这不阻断当前 review 草稿形成。**
+**D-2.8 当前边界内通过；当前已完成外部访问等价样本与扩展 burn-in 的最小增强证据闭环，decision / narrative 在当前扩展样本下继续成立，尚未暴露必须单独开新问题轮的异常。若还要继续强化“公网长期稳定”结论，应在后续追加不同设备 / 不同网络条件样本，但这不阻断当前 review 草稿形成。**
 
 ---
 
@@ -64,81 +65,86 @@
 ### 用户故事 3（P1）
 - 完成情况：通过
 - 是否可独立成立：是
-- 说明：当前 decision 与 narrative 均能基于真实对局事实继续产出并落回既有展示链路，未见“只剩 decision 或只剩 fallback narrative”的断链情况。
+- 说明：当前 decision 与 narrative 不仅在 D-2.7 的最小样本下成立，在 D-2.8 的扩展多回合样本下也继续成立，未见“decision 成立但 narrative 退回 fallback”或“只在单步下成立”的断链情况。
 
 ### 用户故事 5（P2）
 - 完成情况：通过
 - 是否可独立成立：是
-- 说明：后台模型配置仍可驱动真实运行；本轮不仅确认配置值存在，还补了审计摘要与接口级样本，说明当前口径不只是数据库静态值。
+- 说明：后台模型配置与审计入口在外部访问等价视角下仍可正常使用；当前口径不只是数据库静态值或本机页面可达，而是管理端关键 API 入口也能走通。
 
 ### 用户故事 6（P3）
 - 完成情况：阶段性通过
 - 是否可独立成立：基本成立
-- 说明：本轮不是做完整监控或公网治理，而是做“最小 burn-in + 运行口径锁定”。在这一边界内当前已成立；更强的稳定性结论仍需要后续增强样本支持。
+- 说明：本轮不是做完整公网治理或长期监控，而是做“外部访问侧增强样本 + 扩展 burn-in”。在这一边界内当前已成立；更强的稳定性结论仍需要后续不同设备 / 网络条件样本支持。
 
 ---
 
 ## 4. Tasks 完成情况
 ### 已完成任务
-- 已确认当前 `decision / narrative` 模型配置口径：`gpt-5.4 + https://codex.hiyo.top/v1`
-- 已确认两者当前均处于启用状态
-- 已确认服务端 `/api/health` 正常返回
-- 已确认本机 `5173 / 5174` 可达
-- 已确认后台存在 `model-configs / audit-summary` 作为最小巡检入口
-- 已创建 `docs/Task Bundle D-2.7 burn-in 记录.md`
-- 已形成样本 #1：运行口径锁定 + 本机可达性巡检
-- 已形成样本 #2：真实对局 API 下的 decision 主链路样本
-- 已形成样本 #3：真实 `/api/narrative/resolve` 下的 provider narrative 样本
+- 已确认 D-2.8 目标运行口径仍为 `gpt-5.4 + https://codex.hiyo.top/v1`
+- 已确认外部访问等价视角下 `10.3.0.3:5173 / 5174 / 3000/api/health` 均可用
+- 已确认外部访问等价视角下 admin 登录、`model-configs`、`audit-summary` 可用
+- 已创建并补全 `docs/Task Bundle D-2.8 burn-in 记录.md`
+- 已形成样本 #1：外部访问侧三端可达性样本
+- 已形成样本 #2：多回合 decision 扩展 burn-in 样本
+- 已形成样本 #3：narrative 扩展异常样本与最小留痕
+- 已形成样本 #4：按真实前端 envelope 重放后的 narrative 修正样本
+- 已形成样本 #5：外部访问侧后台 API 样本
+- 已形成样本 #6：多回合 narrative 扩展 burn-in 样本
 
 ### 未完成任务
-- 更长时间、多样本的连续 burn-in
-- 外部访问侧的新增公网样本
-- D-2.7 review 最终确认与稳定快照
+- 不同真实外部设备 / 不同网络条件的更强外部访问样本
+- 更长时间、多样本规模的连续 burn-in
+- D-2.8 review 最终确认与稳定快照
 
 ### 偏差说明
-- 本轮“可达性”证据以本机侧为主，不等于已证明公网外部访问长期稳定；
-- 本轮 narrative 样本通过真实 API 验证 `source=provider / fallbackUsed=false`，但尚未补更多回合、更多事件类型的 narrative 样本；
-- 当前尚未观察到必须拆出下一轮的新问题，但样本规模仍偏小。
+- 本轮“外部访问”证据当前仍以机器内网地址的外部访问等价视角为主，不等于已证明公网长期稳定；
+- 本轮已确认 narrative 扩展样本在真实前端 envelope 约束下持续成立，但尚未覆盖更多事件类型；
+- 当前未观察到必须拆出下一轮的新问题，但“更强公网可达性”仍属于增强项，而非本轮前置门槛。
 
 ---
 
 ## 5. 验证结果概览
 ### 主链路验证
-- 内容：运行口径锁定、服务健康检查、真实对局 API decision 样本、真实 narrative API 样本
+- 内容：外部访问等价视角三端可达性、后台关键 API 样本、多回合 decision 样本、多回合 narrative 样本
 - 结果：通过
-- 说明：当前结论建立在真实服务接口、真实数据库配置与真实返回结果之上，而非仅沿用 D-2.6 旧结论。
+- 说明：当前结论建立在真实服务接口、真实数据库配置、真实回合数据与真实 narrative 返回结果之上，而非仅沿用 D-2.7 的旧结论。
 
 ### 用户故事独立验证
-- 后台模型口径锁定 → 通过
-- 服务健康检查 → 通过
-- decision 真实对局主链路 → 通过
-- narrative 真实 provider 主链路 → 通过
-- `source=provider / fallbackUsed=false` narrative 返回 → 通过
+- 外部访问等价视角下客户端 / 管理端 / 服务端可达性 → 通过
+- 外部访问等价视角下后台模型配置与审计入口 → 通过
+- decision 多回合扩展 burn-in → 通过
+- narrative 多回合 provider 路径样本 → 通过
+- `source=provider / fallbackUsed=false` narrative 多回合返回 → 通过
 
 ### 验证明细
 - 样本 #1：
-  - decision / narrative 当前配置均为 `gpt-5.4 + https://codex.hiyo.top/v1`
-  - 两者当前均 `enabled=1`
-  - `GET /api/health` 返回 `{ok:true}`
-  - 本机 `5173 / 5174` 均可达
+  - `10.3.0.3:5173` 返回 web HTML
+  - `10.3.0.3:5174` 返回 admin HTML
+  - `10.3.0.3:3000/api/health` 返回 `{ok:true,"service":"xiangqi-web-server"}`
 - 样本 #2：
-  - 管理员创建临时用户 `smoke_1776050413`
-  - 新用户登录成功，新建 `NORMAL` 对局成功
-  - 用户首步 `a1 -> a2` 后，AI 应手 `b8 -> b1`
-  - 返回体中 decision 结构完整，含 `userMoveTag / aiMoveTag / situationShift / storyThreadSummary`
-- 样本 #3：
-  - 基于样本 #2 的真实 turn 数据调用 `/api/narrative/resolve`
-  - 返回 `200`
-  - `source=provider`
-  - `fallbackUsed=false`
-  - narrative 返回标题、summary、segments 与 decision 焦点一致
+  - 临时用户 `smoke_d28_1776062138` 在 `MASTER` 对局下连续两回合返回 200
+  - AI 应手分别为 `h8 -> h1`、`h1 -> f1`
+  - decision 结构化字段持续完整
+- 样本 #3 / #4：
+  - 手工简化 envelope 调用 `/api/narrative/resolve` 返回 `500 / INTERNAL_ERROR`
+  - 按真实前端 `buildTurnEnvelope` 形状补齐 `capture / checkState / narrativeGoal` 后，同类请求返回 `200 / source=provider / fallbackUsed=false`
+- 样本 #5：
+  - admin 登录成功
+  - `/api/admin/model-configs` 返回 `200`
+  - `/api/admin/audit-summary?limit=3` 返回 `200`
+  - `decision / narrative` 当前配置均为 `gpt-5.4 + https://codex.hiyo.top/v1` 且 `enabled=true`
+- 样本 #6：
+  - 第 1 / 2 回合 narrative 均返回 `200`
+  - 两回合均为 `source=provider / fallbackUsed=false`
+  - 两回合均返回 4 段 narrative segments
 
 ### 外部阻塞 / 条件项（如有）
-- 当前未发现阻断 D-2.7 当前边界 review 的外部阻塞项
+- 当前未发现阻断 D-2.8 当前边界 review 的外部阻塞项
 - 当前仍保留的增强项是：
-  - 外部访问侧新增样本
-  - 更长时间 burn-in
-  - 更系统的体验退化观察
+  - 不同设备 / 不同网络条件下的外部访问样本
+  - 更长时间、多样本连续 burn-in
+  - 更系统的 narrative 事件类型 / schema 漂移观察
 这些增强项当前不阻断 review 草稿形成
 
 ---
@@ -146,61 +152,71 @@
 ## 6. 代码质量结构化判断
 ### 正确性
 - 结论：通过
-- 说明：当前 decision 与 narrative 两条链路都已在真实接口层跑通，未见明显断链或 fallback 冒充成功的情况。
+- 说明：当前 decision 与 narrative 两条链路都已在扩展样本下持续跑通；已观察到的 500 也已确认属于样本构造偏差，而非真实主链路天然失效。
 
 ### 可读性
 - 结论：通过
-- 说明：本轮主要是运行侧验证与文档沉淀，没有引入新的大块实现复杂度。
+- 说明：本轮主要是验证与文档沉淀，没有引入新的大块实现复杂度。
 
 ### 可维护性
 - 结论：基本通过
-- 说明：当前已把运行口径、证据入口与 burn-in 记录落盘，后续继续补样本不必再从零恢复；但公网访问稳定性仍缺少更正式的观测机制。
+- 说明：当前已把 D-2.8 的样本、异常定性和边界结论落盘，后续若继续补外部访问样本或 narrative 事件样本，不必再从零恢复；但更强公网稳定性仍缺少正式观测机制。
 
 ### 范围控制
 - 结论：通过
-- 说明：本轮严格停留在“运行口径锁定 + 最小 burn-in”，没有顺手扩写成完整平台治理或监控系统建设。
+- 说明：本轮严格停留在“外部访问侧样本 + 扩展 burn-in”，没有顺手扩写为完整公网治理、监控平台或大功能开发。
 
 ### 可验证性
 - 结论：通过
-- 说明：本轮具备配置、健康检查、decision、narrative 四类证据，且已形成结构化 burn-in 记录。
+- 说明：本轮已形成外部访问、后台 API、decision、narrative 四类增强证据，且已沉淀到结构化 burn-in 记录中。
+
+### 可选增强项（按需要填写）
+- 简洁性：通过；当前只补最小增强证据，没有扩范围
+- 一致性：通过；review、状态卡与 burn-in 记录当前边界一致
+- 鲁棒性：基本通过；当前样本下继续成立，但仍缺更强网络条件覆盖
+- 可扩展性：基本通过；后续可继续补更多事件类型样本
+- 性能合理性：本轮未见新的明显性能退化信号
 
 ---
 
 ## 7. 问题与风险
-- 当前公网可达性证据仍以本机侧为主，尚不足以直接推出“外部访问长期稳定”；
-- 当前 burn-in 样本数量仍然偏小，尚未覆盖更多回合、更多难度或更多事件类型；
-- 当前 narrative 虽已确认 `source=provider`，但尚未形成针对 schema 漂移、长回合、多事件场景的更系统观察。
+- 当前外部访问证据仍以内网地址的外部访问等价视角为主，尚不足以直接推出“公网长期稳定”；
+- 当前 burn-in 样本数量仍然有限，尚未覆盖更多事件类型、更多用户端条件与更长时间窗口；
+- 当前 narrative 虽已确认多回合 `source=provider / fallbackUsed=false`，但尚未形成针对更复杂 envelope / event 类型的系统观察。
 
 ---
 
 ## 8. 结论
 ### 总体结论
-- [x] 通过（以 D-2.7 当前边界来看）
-- [x] 建议进入稳定快照收口
-- [x] 当前轮次已完全收口
+- [ ] 通过
+- [x] 有条件通过
+- [ ] 不通过
+- [x] 建议进入下一轮迭代
+- [ ] 当前轮次已收口但暂不开启下一轮
 
 ### 结论说明
-以 D-2.7 当前边界来看，当前已经完成：
-1. 运行口径锁定
-2. 最小巡检入口确认
-3. decision 真实对局主链路样本
-4. narrative 真实 provider 主链路样本
-5. burn-in 结构化证据沉淀
+以 D-2.8 当前边界来看，当前已经完成：
+1. 外部访问等价视角样本补齐
+2. 后台关键 API 外部访问等价样本补齐
+3. decision 多回合扩展 burn-in
+4. narrative 多回合扩展 burn-in
+5. D-2.8 期间 narrative 500 的最小定性与边界澄清
+6. burn-in 结构化证据沉淀
 
 因此，当前更准确的结论是：
-**Task Bundle D-2.7 在当前边界内通过，已经具备形成 review 结论的最低证据。若要继续增强，可以追加外部访问样本与更长时间 burn-in；但这些更像增强项，而不是当前 review 草稿的前置阻塞。**
+**Task Bundle D-2.8 在当前边界内有条件通过，已经具备形成 review 草稿的最低证据。条件项并不是“当前主链路仍存未定性异常”，而是“若要继续强化公网 / 外部访问长期稳定性结论，仍需后续追加不同设备 / 网络条件样本”。这类条件项当前不阻断本轮主线 review 草稿形成。**
 
 ---
 
 ## 9. 后续建议
 ### 建议立即处理
-- 本轮 review 已确认，可继续形成稳定快照
-- 若后续继续推进，建议将“外部访问侧新增样本”作为下一轮增强项，而不是回灌到当前轮
+- 当前 review 结论已确认，下一步应形成 D-2.8 的本地稳定快照
+- 若后续继续推进，再决定是否把“更强外部访问样本”单独开成下一轮增强项
 
 ### 可放入下一轮迭代
-- 外部访问侧新增样本
-- 更长时间、多样本 burn-in
-- 更系统的 narrative 退化 / schema 漂移观察
+- 不同设备 / 不同网络条件下的外部访问样本
+- 更长时间、多样本连续 burn-in
+- 更多 narrative 事件类型 / 更复杂 envelope 的稳定性观察
 - 更正式的公网可达性巡检机制
 
 ---
@@ -208,9 +224,10 @@
 ## 10. 最终验收意见
 ### 用户验收意见
 - 用户是否接受当前结论：是
-- 其他验收备注：按“当前边界内通过 / 外部访问样本作为后续增强项”口径收口
+- 用户是否接受条件项不阻断当前主线验收：是
+- 其他验收备注：按“D-2.8 当前边界内有条件通过，公网长期稳定性增强样本作为后续迭代项”口径确认
 
 ### 是否验收通过
-- [x] 是
+- [ ] 是
 - [ ] 否
-- [ ] 阶段性通过
+- [x] 阶段性通过
